@@ -71,7 +71,7 @@ export function TimelineList({ trace, replay, selectedIndex, onSelect, ticks }: 
   }, [replay.playing, selectedIndex]);
 
   return (
-    <div className="relative max-h-96 overflow-y-auto border border-ta-grey-400 bg-ta-grey-500">
+    <div className="relative max-h-[36rem] overflow-y-auto border border-ta-grey-400 bg-ta-grey-500">
       <div className="relative">
         {/* gridlines span the full scrollable height */}
         {ticks.map((t) => (

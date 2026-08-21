@@ -78,13 +78,13 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
           />
         </aside>
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+          <TreemapSection trace={trace} generation={selected} />
           <ReplayBar
             trace={trace}
             replay={replay}
             selectedIndex={selected.index}
             onSelect={selectGeneration}
           />
-          <TreemapSection trace={trace} generation={selected} />
           <ToolCallsSection
             trace={trace}
             selectedIndex={selected.index}
