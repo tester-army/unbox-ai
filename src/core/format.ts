@@ -21,6 +21,13 @@ export function formatMs(ms: number): string {
   return formatSeconds(ms / 1000);
 }
 
+/** Collapses repeated tool names: [a,a,a,b] -> "a x3, b". */
+export function formatCallNames(names: string[]): string {
+  const counts = new Map<string, number>();
+  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  return [...counts.entries()].map(([name, n]) => (n > 1 ? `${name} x${n}` : name)).join(", ");
+}
+
 /** Share of a whole as a percent string: (41, 100) -> "41%". */
 export function formatPercent(part: number, whole: number): string {
   if (whole === 0) return "0%";
