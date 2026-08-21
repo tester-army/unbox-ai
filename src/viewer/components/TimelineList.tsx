@@ -114,13 +114,26 @@ export function TimelineList({
     return map;
   }, [rows]);
 
-  /** Opens the tool row under the pointer; returns false when none is there. */
-  const openToolUnderPointer = (e: React.PointerEvent<HTMLDivElement>): boolean => {
+  const tipsByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.kind !== "agent") map.set(row.key, row.tip);
+    }
+    return map;
+  }, [rows]);
+
+  /** Finds the row under the pointer through the scrub overlay. */
+  const rowKeyUnderPointer = (e: React.PointerEvent<HTMLDivElement>): string | null => {
     const overlay = e.currentTarget;
     overlay.style.pointerEvents = "none";
-    const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-tool-key]");
+    const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-row-key]");
     overlay.style.pointerEvents = "";
-    const key = hit?.getAttribute("data-tool-key");
+    return hit?.getAttribute("data-row-key") ?? null;
+  };
+
+  /** Opens the tool row under the pointer; returns false when none is there. */
+  const openToolUnderPointer = (e: React.PointerEvent<HTMLDivElement>): boolean => {
+    const key = rowKeyUnderPointer(e);
     const entry = key ? callsByKey.get(key) : undefined;
     if (entry) setOpenCall(entry);
     return entry !== undefined;
@@ -146,11 +159,18 @@ export function TimelineList({
           }}
           onPointerMove={(e) => {
             const down = downAt.current;
-            if (!down || e.buttons !== 1) return;
+            if (!down || e.buttons !== 1) {
+              // hovering the track: surface the row's tooltip (tool + params)
+              const key = rowKeyUnderPointer(e);
+              const text = key ? tipsByKey.get(key) : undefined;
+              setTip(text ? { x: e.clientX, y: e.clientY, text } : null);
+              return;
+            }
             if (!down.moved && Math.abs(e.clientX - down.x) < 4 && Math.abs(e.clientY - down.y) < 4) {
               return;
             }
             down.moved = true;
+            setTip(null);
             scrubFromEvent(e);
           }}
           onPointerUp={(e) => {
@@ -203,6 +223,7 @@ export function TimelineList({
               key={row.key}
               ref={!isTool && selected ? selectedRef : undefined}
               data-tool-key={isTool ? row.key : undefined}
+              data-row-key={row.key}
               onClick={() => {
                 onSelect(row.gen);
                 if (isTool) setOpenCall({ call: row.call, gen: row.gen });
@@ -216,15 +237,13 @@ export function TimelineList({
             >
               {isTool ? (
                 <span
-                  className="type-accent-s flex min-w-0 shrink-0 items-baseline gap-2 pl-8"
+                  className={cn(
+                    "type-accent-s min-w-0 shrink-0 truncate pl-8",
+                    row.call.success === false ? "text-ta-error" : "text-ta-grey-100",
+                  )}
                   style={{ width: LABEL_W }}
                 >
-                  <span className={cn(row.call.success === false ? "text-ta-error" : "text-ta-grey-100")}>
-                    {row.call.name}
-                  </span>
-                  <span className="min-w-0 truncate normal-case text-ta-grey-300">
-                    {typeof row.call.args === "string" ? row.call.args : JSON.stringify(row.call.args)}
-                  </span>
+                  {row.call.name}
                 </span>
               ) : (
                 <span
