@@ -29,8 +29,8 @@ export function Waterfall({ trace, selectedIndex, onSelect }: WaterfallProps) {
               aria-pressed={gen.index === selectedIndex}
               title={`${formatTokens(gen.metrics.inputTokens)} in / ${formatTokens(gen.metrics.outputTokens)} out · ${formatCost(gen.metrics.cost)}`}
               className={cn(
-                "type-accent-s flex cursor-pointer items-center gap-3 border-l-2 border-transparent px-4 py-1.5 text-left transition-colors hover:bg-ta-grey-450",
-                gen.index === selectedIndex && "border-ta-orange-300 bg-ta-grey-300/25",
+                "type-accent-s flex cursor-pointer items-center gap-3 px-4 py-1.5 text-left transition-colors hover:bg-ta-grey-450",
+                gen.index === selectedIndex && "bg-ta-grey-300/25",
               )}
             >
               <span

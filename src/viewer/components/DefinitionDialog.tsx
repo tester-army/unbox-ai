@@ -116,7 +116,7 @@ function MessageDefinition({ message }: { message: RawMessage }) {
         <p className="type-body-m whitespace-pre-wrap text-ta-grey-100">{text}</p>
       ))}
       {message.tool_calls?.map((call) => (
-        <div key={call.id} className="border-l-2 border-ta-orange-300 bg-ta-grey-450 px-4 py-3">
+        <div key={call.id} className="border border-ta-grey-400 bg-ta-grey-450 px-4 py-3">
           <p className="type-accent-s text-ta-orange-75">{call.function.name}</p>
           <Mono>{prettyArgs(call.function.arguments)}</Mono>
         </div>

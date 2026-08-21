@@ -66,7 +66,7 @@ function ToolCall({ name, args, result }: { name: string; args: unknown; result?
   const pretty = result !== undefined ? prettyPayload(result) : undefined;
   const short = pretty !== undefined && pretty.length <= RESULT_PREVIEW_CHARS;
   return (
-    <div className="mt-2 border-l-2 border-ta-orange-300 bg-ta-grey-500 px-3 py-2">
+    <div className="mt-2 border border-ta-grey-400 bg-ta-grey-500 px-3 py-2">
       <p className="type-accent-s text-ta-orange-75">{name}</p>
       <pre className="type-body-s overflow-x-auto whitespace-pre-wrap font-(family-name:--font-dm-mono) text-ta-grey-100">
         {prettyArgs(args)}
