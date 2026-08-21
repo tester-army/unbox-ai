@@ -16,6 +16,8 @@ export interface Replay {
   toggle: () => void;
   pause: () => void;
   setSpeed: (speed: number) => void;
+  /** Jumps the clock to an arbitrary point, clamped to [0, total]. */
+  seek: (seconds: number) => void;
   /** Jumps the clock to a generation's start without changing play state. */
   seekToGeneration: (index: number) => void;
 }
@@ -76,6 +78,7 @@ export function useReplay(trace: NormalizedTrace): Replay {
     },
     pause: () => setPlaying(false),
     setSpeed,
+    seek: (seconds) => setElapsed(Math.min(Math.max(seconds, 0), total)),
     seekToGeneration: (index) => setElapsed(starts[index] ?? 0),
   };
 }

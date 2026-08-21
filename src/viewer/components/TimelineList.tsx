@@ -32,11 +32,21 @@ interface TimelineListProps {
   replay: Replay;
   selectedIndex: number;
   onSelect: (index: number) => void;
+  onScrub: (seconds: number) => void;
   ticks: number[];
+  fullscreen: boolean;
 }
 
 /** trigger.dev-style event waterfall: one row per event, time track on the right. */
-export function TimelineList({ trace, replay, selectedIndex, onSelect, ticks }: TimelineListProps) {
+export function TimelineList({
+  trace,
+  replay,
+  selectedIndex,
+  onSelect,
+  onScrub,
+  ticks,
+  fullscreen,
+}: TimelineListProps) {
   const { total, starts } = replay;
   const selectedRef = useRef<HTMLButtonElement>(null);
   const [openCall, setOpenCall] = useState<{ call: PairedToolCall; gen: number } | null>(null);
@@ -88,12 +98,33 @@ export function TimelineList({ trace, replay, selectedIndex, onSelect, ticks }: 
 
   const track = (fraction: number) => `calc(${LABEL_W} + (100% - ${LABEL_W}) * ${fraction})`;
 
+  const scrubFromEvent = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const fraction = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+    onScrub(fraction * total);
+  };
+
   return (
     <div
-      className="relative max-h-[60vh] overflow-y-auto border border-ta-grey-400 bg-ta-grey-500"
+      className={cn(
+        "relative overflow-y-auto border border-ta-grey-400 bg-ta-grey-500",
+        fullscreen ? "min-h-0 flex-1" : "max-h-[60vh]",
+      )}
       onMouseLeave={() => setTip(null)}
     >
       <div className="relative">
+        {/* the track region is a video-style scrub surface; labels stay clickable */}
+        <div
+          className="absolute inset-y-0 right-0 z-10 cursor-ew-resize"
+          style={{ left: LABEL_W }}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            scrubFromEvent(e);
+          }}
+          onPointerMove={(e) => {
+            if (e.buttons === 1) scrubFromEvent(e);
+          }}
+        />
         {ticks.map((t) => (
           <span
             key={t}
