@@ -452,10 +452,18 @@ function buildBreakdown(
   };
 }
 
-/** Drops the trailing assistant response message(s) - they are output, not input. */
+/**
+ * Drops the trailing assistant response - it is output, not input. Trailing
+ * tool results are dropped too: they only occur when an adapter appends the
+ * final step's results for pairing, and those never reached the model either.
+ */
 function withoutResponse(messages: RawMessage[]): RawMessage[] {
   let end = messages.length;
-  while (end > 0 && normalizeRole(messages[end - 1]!.role) === "assistant") end -= 1;
+  while (end > 0) {
+    const role = normalizeRole(messages[end - 1]!.role);
+    if (role !== "assistant" && role !== "tool-result") break;
+    end -= 1;
+  }
   return messages.slice(0, end);
 }
 

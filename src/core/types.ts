@@ -19,9 +19,8 @@ export interface RawEvent {
     tokens: {
       input: number;
       output: number;
-      /** Provider-reported cache hits/writes, when the trace has real numbers. */
+      /** Provider-reported cache-read tokens, when the trace has real numbers. */
       cache_read?: number;
-      cache_write?: number;
     };
     cost: number;
   };
@@ -121,12 +120,13 @@ export interface TokenBreakdown {
   inputTokens: number;
   outputTokens: number;
   /**
-   * Input tokens in the repeated, cache-eligible prefix: the sum of items
-   * marked cached. On an unmutated continuation the cached pool is scaled to
-   * the predecessor's reported input (clamped to this request's input); after
-   * compaction it is a char-proportional estimate up to the first rewrite.
-   * 0 on a segment start, which is conservative: system prompt and tool
-   * definitions may still prefix-match across segments.
+   * Cached-prefix input tokens. When the trace reports real cache reads
+   * (cache_read), this is that number, clamped to the request's input.
+   * Otherwise it is inferred: on an unmutated continuation, the
+   * predecessor's reported input; after compaction, a char-proportional
+   * estimate up to the first rewrite; 0 on a segment start, which is
+   * conservative - system prompt and tool definitions may still
+   * prefix-match across segments.
    */
   cacheableTokens: number;
   groups: BreakdownGroup[];

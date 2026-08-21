@@ -1,24 +1,15 @@
 import type { RawTrace } from "../types";
+import type { TraceAdapter } from "./adapter";
 import { gatewayAdapter } from "./gateway";
 import { opencodeAdapter } from "./opencode";
 
-/**
- * A trace format adapter: recognizes its format and converts it to the
- * internal raw shape (cumulative-snapshot events) everything else consumes.
- *
- * To add a format: create src/core/adapters/<name>.ts exporting a
- * TraceAdapter, and register it here. Order matters - most specific
- * detection first; gateway last since it is the internal shape itself.
- * `adapt` may throw with a readable message for near-misses.
- */
-export interface TraceAdapter {
-  /** Format id, shown in errors and `summary` output. */
-  name: string;
-  detect(json: unknown): boolean;
-  adapt(json: unknown): RawTrace;
-}
+export type { TraceAdapter } from "./adapter";
 
-export const ADAPTERS: TraceAdapter[] = [opencodeAdapter, gatewayAdapter];
+/** Most specific detection first; gateway last - it is the internal shape itself. */
+export const ADAPTERS: TraceAdapter[] = [
+  opencodeAdapter as TraceAdapter,
+  gatewayAdapter as TraceAdapter,
+];
 
 /** Finds the adapter that recognizes this JSON, or throws listing known formats. */
 export function resolveAdapter(json: unknown): TraceAdapter {

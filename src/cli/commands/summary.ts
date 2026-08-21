@@ -37,7 +37,7 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
   );
   console.log(
     `caching   ${formatPercent(cacheableSum(loaded), trace.totalTokens.input)} of input tokens ` +
-      `were a repeated prefix within a segment (cache-eligible)`,
+      `were cached prefix (reported cache reads when available, else estimated from repeats)`,
   );
   console.log("");
   for (const gen of trace.generations) {

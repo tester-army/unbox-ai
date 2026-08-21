@@ -1,5 +1,5 @@
 import type { RawEvent, RawMessage, RawTrace } from "../types";
-import type { TraceAdapter } from "./index";
+import type { TraceAdapter } from "./adapter";
 
 /**
  * Adapter for opencode session exports ({info, messages[{info, parts}]}).
@@ -7,10 +7,10 @@ import type { TraceAdapter } from "./index";
  * one event per step-finish, each with the conversation so far. Real cache
  * read/write tokens and per-tool durations carry over.
  */
-export const opencodeAdapter: TraceAdapter = {
+export const opencodeAdapter: TraceAdapter<OpencodeExport> = {
   name: "opencode",
   detect: isOpencodeTrace,
-  adapt: (json) => adaptOpencodeTrace(json as OpencodeExport),
+  adapt: adaptOpencodeTrace,
 };
 
 interface OpencodeExport {
@@ -53,6 +53,7 @@ interface OpencodePart {
     status?: string;
     input?: unknown;
     output?: unknown;
+    error?: unknown;
     time?: { start?: number; end?: number };
   };
   tokens?: OpencodeTokens;
@@ -64,6 +65,8 @@ function isOpencodeTrace(raw: unknown): raw is OpencodeExport {
   return (
     typeof t === "object" &&
     t !== null &&
+    typeof t.info === "object" &&
+    t.info !== null &&
     Array.isArray(t.messages) &&
     t.messages.every((m) => Array.isArray((m as OpencodeMessage)?.parts))
   );
@@ -80,11 +83,20 @@ function adaptOpencodeTrace(oc: OpencodeExport): RawTrace {
       continue;
     }
     const steps = splitSteps(message.parts);
-    const duration = messageSeconds(message) / Math.max(steps.length, 1);
+    const hasAnyFinish = message.parts.some((p) => p.type === "step-finish");
+    // model time excludes tool execution, which the message duration includes
+    const toolSeconds =
+      message.parts.reduce((acc, p) => acc + (p.type === "tool" ? (toolMs(p) ?? 0) : 0), 0) / 1000;
+    const duration =
+      Math.max(messageSeconds(message) - toolSeconds, 0) / Math.max(steps.length, 1);
     for (const step of steps) {
       const finish = step.find((p) => p.type === "step-finish");
       const tools = step.filter((p) => p.type === "tool");
       conversation.push(assistantMessage(step, tools));
+      // message-level tokens/cost describe the whole message; they only stand
+      // in for a step that has no finish when NO step of the message finished
+      // (aborted single step) - a trailing partial after a finish reports 0
+      const metricsSource = finish ?? (hasAnyFinish ? undefined : message.info);
       events.push({
         type: "generation",
         name: message.info.agent ?? "assistant",
@@ -92,8 +104,8 @@ function adaptOpencodeTrace(oc: OpencodeExport): RawTrace {
         provider: message.info.providerID ?? "unknown",
         metrics: {
           latency: duration,
-          tokens: totalTokens(finish?.tokens ?? message.info.tokens),
-          cost: finish?.cost ?? message.info.cost ?? 0,
+          tokens: totalTokens(metricsSource?.tokens),
+          cost: metricsSource?.cost ?? 0,
         },
         messages: [...conversation],
       });
@@ -101,13 +113,24 @@ function adaptOpencodeTrace(oc: OpencodeExport): RawTrace {
       for (const tool of tools) {
         conversation.push({
           role: "tool",
-          content: stringify(tool.state?.output),
+          content: stringify(tool.state?.output ?? tool.state?.error),
           tool_call_id: tool.callID,
           duration_ms: toolMs(tool),
-          success: tool.state?.status === "error" ? false : tool.state?.status === "completed",
+          ...(tool.state?.status === "completed"
+            ? { success: true }
+            : tool.state?.status === "error"
+              ? { success: false }
+              : {}),
         });
       }
     }
+  }
+
+  // the final step's tool results have no next snapshot to land in - extend
+  // the last event so pairing still sees them
+  const lastEvent = events.at(-1);
+  if (lastEvent && conversation.length > lastEvent.messages.length) {
+    lastEvent.messages = [...conversation];
   }
 
   return {
@@ -164,7 +187,9 @@ function totalTokens(tokens: OpencodeTokens | undefined): RawEvent["metrics"]["t
   return {
     input: (tokens?.input ?? 0) + read + write,
     output: tokens?.output ?? 0,
-    ...(read > 0 || write > 0 ? { cache_read: read, cache_write: write } : {}),
+    // a reported cache object is a real signal even when read is 0 - a true
+    // cache miss must not fall back to prefix inference downstream
+    ...(tokens?.cache ? { cache_read: read } : {}),
   };
 }
 
