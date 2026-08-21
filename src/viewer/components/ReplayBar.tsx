@@ -53,7 +53,20 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
             no latency data in this trace
           </p>
         ) : (
-          <div className="relative h-16 w-full border border-ta-grey-400 bg-ta-grey-500">
+          <div className="relative h-21 w-full border border-ta-grey-400 bg-ta-grey-500">
+            {segmentRuns(trace, starts).map((run) => (
+              <span
+                key={run.key}
+                className="type-accent-s absolute top-0 flex h-5 items-center overflow-hidden border-l border-ta-grey-400 pl-1.5 whitespace-nowrap text-ta-grey-200"
+                style={{
+                  left: `${(run.start / total) * 100}%`,
+                  width: `${(run.duration / total) * 100}%`,
+                }}
+                title={`segment ${run.segment} · ${run.name}`}
+              >
+                s{run.segment} · {run.name}
+              </span>
+            ))}
             {trace.generations.map((gen) => {
               const { latency, timeToFirstToken } = gen.metrics;
               const ttftShare =
@@ -72,7 +85,7 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
                     timeToFirstToken !== undefined ? `, ttft ${formatSeconds(timeToFirstToken)}` : ""
                   }, ${formatPercent(cacheableTokens, inputTokens)} repeated prefix`}
                   className={cn(
-                    "absolute inset-y-0 cursor-pointer overflow-hidden border-r border-ta-grey-500",
+                    "absolute top-5 bottom-0 cursor-pointer overflow-hidden border-r border-ta-grey-500",
                     selected ? "bg-ta-grey-300/60" : "bg-ta-grey-450 hover:bg-ta-grey-300/40",
                   )}
                   style={{
@@ -110,4 +123,31 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
       </div>
     </Section>
   );
+}
+
+interface SegmentRun {
+  key: string;
+  segment: number;
+  name: string;
+  start: number;
+  duration: number;
+}
+
+/** Contiguous runs of generations in the same segment, on the model-time axis. */
+function segmentRuns(trace: NormalizedTrace, starts: number[]): SegmentRun[] {
+  const runs: SegmentRun[] = [];
+  trace.generations.forEach((gen, i) => {
+    const prev = trace.generations[i - 1];
+    if (!prev || prev.segment !== gen.segment) {
+      runs.push({
+        key: `${gen.segment}:${i}`,
+        segment: gen.segment,
+        name: gen.name,
+        start: starts[i] ?? 0,
+        duration: 0,
+      });
+    }
+    runs[runs.length - 1]!.duration += gen.metrics.latency;
+  });
+  return runs;
 }

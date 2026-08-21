@@ -93,7 +93,7 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
           <Suspense fallback={null}>
             <InsightsSection trace={trace} onSelect={selectGeneration} />
           </Suspense>
-          <GenerationDetail key={selected.index} generation={selected} />
+          <GenerationDetail key={selected.index} trace={trace} generation={selected} />
         </main>
       </div>
     </Shell>

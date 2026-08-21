@@ -1,8 +1,19 @@
-import type { NormalizedTrace } from "@core/types";
+import { Fragment, useMemo, useState } from "react";
+import type { NormalizedTrace, PairedToolCall } from "@core/types";
 import { allToolCalls } from "@core/normalize";
 import { formatCompact, formatMs } from "@core/format";
 import { Section } from "@/components/ui/section";
 import { cn } from "@/lib/utils";
+
+const GRID = "grid grid-cols-[minmax(9rem,1fr)_4rem_4rem_5rem_5rem_minmax(6rem,1.5fr)] items-center gap-x-4";
+
+interface ToolUsage {
+  name: string;
+  calls: (PairedToolCall & { gen: number })[];
+  failures: number;
+  totalMs: number | null;
+  totalSize: number;
+}
 
 interface ToolCallsSectionProps {
   trace: NormalizedTrace;
@@ -10,117 +21,96 @@ interface ToolCallsSectionProps {
   onSelect: (index: number) => void;
 }
 
-/**
- * Every tool call in the run, network-inspector style. Columns adapt to the
- * trace: time and status only appear when result payloads report them, and
- * the bar falls back to result size when no durations exist.
- */
-export function ToolCallsSection({ trace, selectedIndex, onSelect }: ToolCallsSectionProps) {
-  const rows = allToolCalls(trace);
-  if (rows.length === 0) return null;
-  const hasDuration = rows.some((row) => row.durationMs !== undefined);
-  const hasStatus = rows.some((row) => row.success !== undefined);
-  const maxDuration = Math.max(...rows.map((row) => row.durationMs ?? 0), 1);
-  const maxSize = Math.max(...rows.map((row) => row.result?.length ?? 0), 1);
+/** Tool usage summary: one row per tool, expandable to its individual calls. */
+export function ToolCallsSection({ trace, onSelect }: ToolCallsSectionProps) {
+  const [openTool, setOpenTool] = useState<string | null>(null);
+  const usage = useMemo(() => {
+    const byName = new Map<string, ToolUsage>();
+    for (const call of allToolCalls(trace)) {
+      const entry = byName.get(call.name) ?? {
+        name: call.name,
+        calls: [],
+        failures: 0,
+        totalMs: null,
+        totalSize: 0,
+      };
+      entry.calls.push(call);
+      if (call.success === false) entry.failures += 1;
+      if (call.durationMs !== undefined) entry.totalMs = (entry.totalMs ?? 0) + call.durationMs;
+      entry.totalSize += call.result?.length ?? 0;
+      byName.set(call.name, entry);
+    }
+    return [...byName.values()].sort((a, b) => b.calls.length - a.calls.length);
+  }, [trace]);
 
-  const columns = [
-    "3rem",
-    "minmax(8rem, 14rem)",
-    "minmax(10rem, 2fr)",
-    ...(hasStatus ? ["4rem"] : []),
-    ...(hasDuration ? ["5rem"] : []),
-    "4rem",
-    "minmax(6rem, 1fr)",
-  ].join(" ");
-  const grid = { display: "grid", gridTemplateColumns: columns, columnGap: "1rem" } as const;
+  if (usage.length === 0) return null;
+  const maxSize = Math.max(...usage.map((u) => u.totalSize), 1);
+  const totalCalls = usage.reduce((a, u) => a + u.calls.length, 0);
 
   return (
-    <Section title="tool calls" meta={`${rows.length} calls`}>
-      <div className="type-accent-s max-h-80 overflow-x-auto overflow-y-auto px-6 pb-4" role="table">
-        <div style={grid} className="border-b border-ta-grey-400 pb-1 text-ta-grey-200" role="row">
-          <span role="columnheader">gen</span>
-          <span role="columnheader">name</span>
-          <span role="columnheader">args</span>
-          {hasStatus && <span role="columnheader">status</span>}
-          {hasDuration && (
-            <span role="columnheader" className="text-right">
-              time
-            </span>
-          )}
-          <span role="columnheader" className="text-right" title="result chars">
-            size
+    <Section title="tools" meta={`${totalCalls} calls across ${usage.length} tools · click a tool for its calls`}>
+      <div className="type-accent-s px-6 pb-4">
+        <div className={cn(GRID, "border-b border-ta-grey-400 pb-1 text-ta-grey-200")}>
+          <span>tool</span>
+          <span className="text-right">calls</span>
+          <span className="text-right">failed</span>
+          <span className="text-right">time</span>
+          <span className="text-right" title="total result chars">
+            output
           </span>
-          <span role="columnheader" aria-label={hasDuration ? "duration bar" : "size bar"}>
-            {hasDuration ? "waterfall" : ""}
-          </span>
+          <span title="share of total tool output">output share</span>
         </div>
-        {rows.map((row) => {
-          const share = hasDuration
-            ? (row.durationMs ?? 0) / maxDuration
-            : (row.result?.length ?? 0) / maxSize;
-          return (
+        {usage.map((tool) => (
+          <Fragment key={tool.name}>
             <button
-              key={`${row.gen}:${row.id}`}
-              role="row"
-              onClick={() => onSelect(row.gen)}
-              aria-pressed={row.gen === selectedIndex}
-              style={grid}
+              onClick={() => setOpenTool((v) => (v === tool.name ? null : tool.name))}
+              aria-expanded={openTool === tool.name}
               className={cn(
-                "w-full cursor-pointer items-center border-b border-ta-grey-450 py-1 text-left transition-colors hover:bg-ta-grey-450",
-                row.gen === selectedIndex && "bg-ta-grey-450",
+                GRID,
+                "w-full cursor-pointer border-b border-ta-grey-450 py-1.5 text-left transition-colors hover:bg-ta-grey-450",
+                openTool === tool.name && "bg-ta-grey-450",
               )}
             >
-              <span role="cell" className="text-ta-grey-200">
-                [{row.gen}]
+              <span className="truncate text-ta-sand-50">{tool.name}</span>
+              <span className="text-right text-ta-grey-100">{tool.calls.length}</span>
+              <span className={cn("text-right", tool.failures > 0 ? "text-ta-error" : "text-ta-grey-300")}>
+                {tool.failures > 0 ? tool.failures : "-"}
               </span>
-              <span role="cell" className="truncate text-ta-sand-50">
-                {row.name}
+              <span className="text-right text-ta-grey-100">
+                {tool.totalMs !== null ? formatMs(tool.totalMs) : "-"}
               </span>
-              <span role="cell" className="truncate normal-case text-ta-grey-200">
-                {typeof row.args === "string" ? row.args : JSON.stringify(row.args)}
-              </span>
-              {hasStatus && <Status success={row.success} hasResult={row.result !== undefined} />}
-              {hasDuration && (
-                <span role="cell" className="text-right text-ta-grey-100">
-                  {row.durationMs !== undefined ? formatMs(row.durationMs) : "-"}
-                </span>
-              )}
-              <span role="cell" className="text-right text-ta-grey-200" title="result chars">
-                {row.result !== undefined ? formatCompact(row.result.length) : "-"}
-              </span>
-              <span role="cell" className="relative h-2 bg-ta-grey-450">
+              <span className="text-right text-ta-grey-200">{formatCompact(tool.totalSize)}</span>
+              <span className="relative h-2 bg-ta-grey-450">
                 <span
-                  className={cn(
-                    "absolute inset-y-0 left-0",
-                    row.success === false ? "bg-ta-error" : "bg-ta-orange-300",
-                  )}
-                  style={{ width: `${share * 100}%` }}
+                  className="absolute inset-y-0 left-0 bg-ta-orange-300"
+                  style={{ width: `${(tool.totalSize / maxSize) * 100}%` }}
                 />
               </span>
             </button>
-          );
-        })}
+            {openTool === tool.name &&
+              tool.calls.map((call) => (
+                <button
+                  key={`${call.gen}:${call.id}`}
+                  onClick={() => onSelect(call.gen)}
+                  title="jump to this generation"
+                  className="flex w-full cursor-pointer items-center gap-4 border-b border-ta-grey-450 py-1 pl-6 text-left transition-colors hover:bg-ta-grey-450"
+                >
+                  <span className="w-8 shrink-0 text-right text-ta-grey-300">{call.gen}</span>
+                  <span className="min-w-0 flex-1 truncate normal-case text-ta-grey-200">
+                    {typeof call.args === "string" ? call.args : JSON.stringify(call.args)}
+                  </span>
+                  {call.success === false && <span className="shrink-0 text-ta-error">failed</span>}
+                  <span className="w-14 shrink-0 text-right text-ta-grey-200">
+                    {call.durationMs !== undefined ? formatMs(call.durationMs) : ""}
+                  </span>
+                  <span className="w-12 shrink-0 text-right text-ta-grey-300">
+                    {call.result !== undefined ? formatCompact(call.result.length) : "-"}
+                  </span>
+                </button>
+              ))}
+          </Fragment>
+        ))}
       </div>
     </Section>
-  );
-}
-
-function Status({ success, hasResult }: { success?: boolean; hasResult: boolean }) {
-  if (success === false)
-    return (
-      <span role="cell" className="truncate text-ta-error">
-        failed
-      </span>
-    );
-  if (success === true)
-    return (
-      <span role="cell" className="text-ta-grey-100">
-        ok
-      </span>
-    );
-  return (
-    <span role="cell" className="text-ta-grey-200">
-      {hasResult ? "done" : "-"}
-    </span>
   );
 }

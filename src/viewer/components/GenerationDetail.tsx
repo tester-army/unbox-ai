@@ -1,12 +1,26 @@
-import type { Generation } from "@core/types";
+import { useState } from "react";
+import type { Generation, NormalizedTrace } from "@core/types";
 import { formatCost, formatPercent, formatSeconds, formatTokens } from "@core/format";
 import { MessageCard } from "@/components/MessageCard";
+import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Section } from "@/components/ui/section";
 
+interface GenerationDetailProps {
+  trace: NormalizedTrace;
+  generation: Generation;
+}
+
 /** The selected generation: metrics line plus its new-vs-previous messages. */
-export function GenerationDetail({ generation }: { generation: Generation }) {
+export function GenerationDetail({ trace, generation }: GenerationDetailProps) {
+  const [showCarried, setShowCarried] = useState(false);
   const m = generation.metrics;
+  // the carried context is the thread's earlier messages, shown dimmed
+  const carried = showCarried
+    ? trace.generations
+        .filter((g) => g.segment === generation.segment && g.index < generation.index)
+        .flatMap((g) => g.newMessages)
+    : [];
   return (
     <Section
       title={`generation ${generation.index}`}
@@ -40,6 +54,23 @@ export function GenerationDetail({ generation }: { generation: Generation }) {
           </>
         )}
       </p>
+      {generation.carriedMessages > 0 && (
+        <Button className="self-start" onClick={() => setShowCarried((v) => !v)}>
+          {showCarried
+            ? "hide carried context"
+            : `show carried context (${generation.carriedMessages} messages)`}
+        </Button>
+      )}
+      {showCarried && (
+        <div className="flex flex-col gap-2 opacity-60">
+          {carried.map((message) => (
+            <MessageCard key={`carried-${message.index}`} message={message} />
+          ))}
+        </div>
+      )}
+      {showCarried && carried.length > 0 && (
+        <p className="type-accent-s text-ta-grey-200">new in this generation ↓</p>
+      )}
       <div className="flex flex-col gap-2">
         {generation.newMessages.map((message) => (
           <MessageCard key={message.index} message={message} />
