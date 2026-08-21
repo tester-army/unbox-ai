@@ -48,6 +48,7 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
     <Section
       title="time"
       hint="time chart"
+      className="flex min-h-0 flex-1 flex-col"
       meta={
         <>
           {formatSeconds(total)} <Hint term="model time">model time</Hint> · drag the timeline to scrub
@@ -64,7 +65,10 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
     >
       <div
         ref={playerRef}
-        className={cn("px-6 pb-4", fullscreen && "flex h-full flex-col bg-ta-grey-500 p-4")}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col px-6 pb-4",
+          fullscreen && "bg-ta-grey-500 p-4",
+        )}
       >
         {total <= 0 ? (
           <p className="type-accent-s border border-ta-grey-400 px-3 py-2 text-ta-grey-200">
@@ -80,7 +84,6 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
                 onSelect={onSelect}
                 onScrub={scrub}
                 ticks={ticks}
-                fullscreen={fullscreen}
               />
             ) : (
               <Lanes

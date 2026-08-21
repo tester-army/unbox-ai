@@ -34,7 +34,6 @@ interface TimelineListProps {
   onSelect: (index: number) => void;
   onScrub: (seconds: number) => void;
   ticks: number[];
-  fullscreen: boolean;
 }
 
 /** trigger.dev-style event waterfall: one row per event, time track on the right. */
@@ -45,7 +44,6 @@ export function TimelineList({
   onSelect,
   onScrub,
   ticks,
-  fullscreen,
 }: TimelineListProps) {
   const { total, starts } = replay;
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -106,10 +104,7 @@ export function TimelineList({
 
   return (
     <div
-      className={cn(
-        "relative overflow-y-auto border border-ta-grey-400 bg-ta-grey-500",
-        fullscreen ? "min-h-0 flex-1" : "max-h-[60vh]",
-      )}
+      className="relative min-h-48 flex-1 overflow-y-auto border border-ta-grey-400 bg-ta-grey-500"
       onMouseLeave={() => setTip(null)}
     >
       <div className="relative">

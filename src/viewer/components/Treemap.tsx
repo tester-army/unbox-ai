@@ -7,7 +7,7 @@ import { useElementSize } from "@/lib/use-element-size";
 import { cn } from "@/lib/utils";
 
 const GROUP_HEADER = 20;
-const HEIGHT = 380;
+const HEIGHT = 280;
 
 const GROUP_STYLE: Record<
   BreakdownGroupKey,

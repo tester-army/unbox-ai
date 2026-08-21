@@ -73,13 +73,16 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
           />
         </aside>
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-          <TreemapSection trace={trace} generation={selected} />
-          <ReplayBar
-            trace={trace}
-            replay={replay}
-            selectedIndex={selected.index}
-            onSelect={selectGeneration}
-          />
+          {/* context + timeline fill exactly the first viewport; the rest scrolls in */}
+          <div className="flex h-full shrink-0 flex-col">
+            <TreemapSection trace={trace} generation={selected} />
+            <ReplayBar
+              trace={trace}
+              replay={replay}
+              selectedIndex={selected.index}
+              onSelect={selectGeneration}
+            />
+          </div>
           <ToolCallsSection
             trace={trace}
             selectedIndex={selected.index}

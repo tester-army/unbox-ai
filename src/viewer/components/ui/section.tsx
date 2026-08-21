@@ -12,14 +12,23 @@ interface SectionProps {
   /** Controls rendered on the right, always visible. */
   actions?: ReactNode;
   defaultOpen?: boolean;
+  className?: string;
   children: ReactNode;
 }
 
 /** Collapsible dashboard section with a consistent, uncrowded header. */
-export function Section({ title, hint, meta, actions, defaultOpen = true, children }: SectionProps) {
+export function Section({
+  title,
+  hint,
+  meta,
+  actions,
+  defaultOpen = true,
+  className,
+  children,
+}: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="border-b border-ta-grey-400">
+    <section className={cn("border-b border-ta-grey-400", className)}>
       <div className="flex min-h-13 items-center gap-4 px-6 py-2">
         <button
           onClick={() => setOpen((v) => !v)}
