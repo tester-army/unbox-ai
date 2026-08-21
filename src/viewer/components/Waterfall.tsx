@@ -30,14 +30,31 @@ export function Waterfall({ trace, selectedIndex, onSelect }: WaterfallProps) {
               title={`${formatTokens(gen.metrics.inputTokens)} in / ${formatTokens(gen.metrics.outputTokens)} out · ${formatCost(gen.metrics.cost)}`}
               className={cn(
                 "type-accent-s flex cursor-pointer items-center gap-3 border-l-2 border-transparent px-4 py-1.5 text-left transition-colors hover:bg-ta-grey-450",
-                gen.index === selectedIndex && "border-ta-orange-300 bg-ta-grey-450",
+                gen.index === selectedIndex && "border-ta-orange-300 bg-ta-grey-300/25",
               )}
             >
-              <span className="w-5 shrink-0 text-right text-ta-grey-300">{gen.index}</span>
-              <span className="min-w-0 flex-1 truncate text-ta-grey-100">
+              <span
+                className={cn(
+                  "w-5 shrink-0 text-right",
+                  gen.index === selectedIndex ? "text-ta-orange-300" : "text-ta-grey-300",
+                )}
+              >
+                {gen.index}
+              </span>
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate",
+                  gen.index === selectedIndex ? "text-ta-sand-50" : "text-ta-grey-100",
+                )}
+              >
                 {calls || "text response"}
               </span>
-              <span className="shrink-0 text-ta-grey-200">
+              <span
+                className={cn(
+                  "shrink-0",
+                  gen.index === selectedIndex ? "text-ta-sand-50" : "text-ta-grey-200",
+                )}
+              >
                 {formatSeconds(gen.metrics.latency)}
               </span>
             </button>
