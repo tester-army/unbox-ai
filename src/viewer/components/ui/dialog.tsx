@@ -8,7 +8,7 @@ const DialogClose = BaseDialog.Close;
 function DialogContent({ className, children, ...props }: ComponentProps<typeof BaseDialog.Popup>) {
   return (
     <BaseDialog.Portal>
-      <BaseDialog.Backdrop className="fixed inset-0 bg-black/85" />
+      <BaseDialog.Backdrop className="fixed inset-0 bg-black/50" />
       <BaseDialog.Popup
         className={cn(
           "fixed left-1/2 top-1/2 flex max-h-[80vh] w-[min(56rem,90vw)] -translate-x-1/2 -translate-y-1/2 flex-col border border-ta-grey-400 bg-ta-grey-500",
