@@ -3,6 +3,7 @@ import type { Generation, NormalizedTrace } from "@core/types";
 import { formatPercent, formatTokens } from "@core/format";
 import { Treemap } from "@/components/Treemap";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildTreemapData,
@@ -90,47 +91,53 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
             <span className="text-ta-grey-200">hover a block to inspect it · click to pin its full definition</span>
           )}
         </div>
-        {pinned && <DefinitionPanel leaf={pinned} onClose={() => setPinnedId(null)} />}
+        {pinned && <DefinitionDialog leaf={pinned} onClose={() => setPinnedId(null)} />}
       </div>
     </section>
   );
 }
 
-/** Full raw definition of a pinned block, fetched on demand via /api/raw. */
-function DefinitionPanel({ leaf, onClose }: { leaf: TreemapLeaf; onClose: () => void }) {
+/** Full raw definition of a clicked block in a modal, fetched via /api/raw. */
+function DefinitionDialog({ leaf, onClose }: { leaf: TreemapLeaf; onClose: () => void }) {
   const [content, setContent] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     setContent(null);
-    fetch(`/api/raw?path=${encodeURIComponent(leaf.ref)}`)
-      .then(async (res) => {
-        const body = await res.json();
-        if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
-        return body.value;
-      })
-      .then((value) => {
-        if (!cancelled) {
-          setContent(typeof value === "string" ? value : JSON.stringify(value, null, 2));
-        }
-      })
-      .catch((error) => !cancelled && setContent(`failed to load: ${error}`));
+    fetchRawValue(leaf.ref)
+      .then((value) => !cancelled && setContent(value))
+      .catch((error) => !cancelled && setContent(String(error)));
     return () => {
       cancelled = true;
     };
   }, [leaf.ref]);
 
   return (
-    <div className="mt-2 border border-ta-grey-400 bg-ta-grey-450">
-      <div className="flex items-baseline gap-3 border-b border-ta-grey-400 px-3 py-1.5">
-        <span className="type-accent-s text-ta-orange-75">{leaf.label}</span>
-        <span className="type-accent-s text-ta-grey-200">{leaf.ref}</span>
-        <Button className="ml-auto border-none" onClick={onClose}>
-          close
-        </Button>
-      </div>
-      <pre className="type-body-s max-h-72 overflow-auto whitespace-pre-wrap px-3 py-2 font-(family-name:--font-dm-mono) text-ta-grey-100">
-        {content ?? "loading..."}
-      </pre>
-    </div>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <div className="flex items-baseline gap-4 border-b border-ta-grey-400 px-4 py-3">
+          <DialogTitle>{leaf.label}</DialogTitle>
+          <span className="type-accent-s text-ta-grey-200">{leaf.ref}</span>
+          <DialogClose
+            render={
+              <Button className="ml-auto border-none">close</Button>
+            }
+          />
+        </div>
+        <pre className="type-body-s min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-4 py-3 font-(family-name:--font-dm-mono) text-ta-grey-100">
+          {content ?? "loading..."}
+        </pre>
+      </DialogContent>
+    </Dialog>
   );
+}
+
+/** Fetches a raw-trace value, failing legibly when the server is older than the viewer. */
+async function fetchRawValue(ref: string): Promise<string> {
+  const res = await fetch(`/api/raw?path=${encodeURIComponent(ref)}`);
+  if (!res.headers.get("content-type")?.includes("application/json")) {
+    throw new Error("this unbox-ai server is older than the viewer - restart it and reload");
+  }
+  const body = await res.json();
+  if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+  return typeof body.value === "string" ? body.value : JSON.stringify(body.value, null, 2);
 }

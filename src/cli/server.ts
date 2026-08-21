@@ -45,6 +45,12 @@ export async function startServer(
       res.end(JSON.stringify(value === undefined ? { error: "nothing at path" } : { value }));
       return;
     }
+    // unknown api routes must never fall through to the SPA's html
+    if (url.pathname.startsWith("/api/")) {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: `unknown api route: ${url.pathname}` }));
+      return;
+    }
     let requested: string;
     try {
       requested = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
