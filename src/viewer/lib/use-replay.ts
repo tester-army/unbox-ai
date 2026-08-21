@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { NormalizedTrace } from "@core/types";
 
-export const SPEEDS = [1, 4, 16];
+export const SPEEDS = [1, 4, 8];
 
 export interface Replay {
   playing: boolean;
