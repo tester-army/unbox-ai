@@ -16,7 +16,13 @@ export interface RawEvent {
   metrics: {
     latency: number;
     time_to_first_token?: number;
-    tokens: { input: number; output: number };
+    tokens: {
+      input: number;
+      output: number;
+      /** Provider-reported cache hits/writes, when the trace has real numbers. */
+      cache_read?: number;
+      cache_write?: number;
+    };
     cost: number;
   };
   available_tools?: RawToolDef[];
@@ -35,6 +41,10 @@ export interface RawMessage {
   content: unknown;
   tool_calls?: RawToolCall[];
   tool_call_id?: string;
+  /** Adapter-provided tool execution time, when the source trace reports one. */
+  duration_ms?: number;
+  /** Adapter-provided tool outcome, when the source trace reports one. */
+  success?: boolean;
 }
 
 export interface RawToolCall {

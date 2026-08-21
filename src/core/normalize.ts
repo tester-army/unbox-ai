@@ -1,3 +1,4 @@
+import { adaptOpencodeTrace, isOpencodeTrace } from "./adapters/opencode";
 import type {
   BreakdownGroup,
   BreakdownItem,
@@ -20,6 +21,16 @@ const CHARS_PER_TOKEN = 4;
  * snapshots, pairs tool results with their calls, and attributes input
  * tokens to system prompt / tools / conversation for the treemap.
  */
+/**
+ * Parses any supported trace JSON into the internal raw shape: gateway
+ * exports pass through, other formats go through their adapter.
+ */
+export function parseTrace(json: unknown): RawTrace {
+  if (isOpencodeTrace(json)) return adaptOpencodeTrace(json);
+  assertTraceShape(json);
+  return json;
+}
+
 export function normalizeTrace(raw: RawTrace): NormalizedTrace {
   assertTraceShape(raw);
   const positions = assignSegments(raw.events);
@@ -182,8 +193,14 @@ interface CacheableSpec {
 }
 
 function cacheableSpec(pos: EventPosition, events: RawEvent[], event: RawEvent): CacheableSpec {
+  // provider-reported cache reads beat any inference
+  const reported = event.metrics.tokens.cache_read;
+  const exactReported =
+    reported !== undefined
+      ? { exactTokens: Math.min(reported, event.metrics.tokens.input) }
+      : undefined;
   if (pos.prevIndex === null || pos.carried === 0) {
-    return { uptoMessage: 0, toolsCached: false };
+    return { uptoMessage: 0, toolsCached: false, ...exactReported };
   }
   const prev = events[pos.prevIndex]!;
   // the predecessor's response was never in a prior request - it is fresh
@@ -193,12 +210,13 @@ function cacheableSpec(pos: EventPosition, events: RawEvent[], event: RawEvent):
   return {
     uptoMessage,
     toolsCached: true,
-    ...(unmutated
-      ? {
-          // provider token reporting is not monotonic: clamp to this request's input
-          exactTokens: Math.min(prev.metrics.tokens.input, event.metrics.tokens.input),
-        }
-      : {}),
+    ...(exactReported ??
+      (unmutated
+        ? {
+            // provider token reporting is not monotonic: clamp to this request's input
+            exactTokens: Math.min(prev.metrics.tokens.input, event.metrics.tokens.input),
+          }
+        : {})),
   };
 }
 
@@ -244,6 +262,9 @@ interface ToolResult {
   text: string;
   /** Event and message index of the result's first appearance in the raw trace. */
   ref: { event: number; message: number };
+  /** Adapter-provided execution metadata, when the source trace reports it. */
+  durationMs?: number;
+  success?: boolean;
 }
 
 interface Pairing {
@@ -268,6 +289,8 @@ function collectPairing(events: RawEvent[], positions: EventPosition[]): Pairing
         results.set(`${segment}:${message.tool_call_id}`, {
           text: contentToText(message.content),
           ref: { event: eventIndex, message: messageIndex },
+          ...(message.duration_ms !== undefined ? { durationMs: message.duration_ms } : {}),
+          ...(message.success !== undefined ? { success: message.success } : {}),
         });
       }
     });
@@ -288,7 +311,16 @@ function normalizeMessage(
       id: call.id,
       name: call.function.name,
       args: call.function.arguments,
-      ...(result ? { result: result.text, resultRef: result.ref, ...resultMeta(result.text) } : {}),
+      ...(result
+        ? {
+            result: result.text,
+            resultRef: result.ref,
+            // adapter-reported metadata beats payload sniffing
+            ...resultMeta(result.text),
+            ...(result.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
+            ...(result.success !== undefined ? { success: result.success } : {}),
+          }
+        : {}),
     };
   });
   return {
@@ -401,7 +433,7 @@ function buildBreakdown(
 
   const all = [...system, ...tools, ...conversation];
   const cachedItems = all.filter((item) => item.cached);
-  if (cacheable.exactTokens !== undefined) {
+  if (cacheable.exactTokens !== undefined && cachedItems.length > 0) {
     // the exact split is known: scale each pool to its true total so the
     // header numbers and the faint/bright areas agree by construction
     scaleToReportedTokens(cachedItems, cacheable.exactTokens);
@@ -418,7 +450,10 @@ function buildBreakdown(
     { key: "tools", estTokens: sumTokens(tools), items: tools },
     { key: "conversation", estTokens: sumTokens(conversation), items: conversation },
   ];
-  const cacheableTokens = sumTokens(cachedItems);
+  // no structurally-cached blocks to scale (e.g. reported cache hits without
+  // a detectable carried prefix): fall back to the reported number directly
+  const cacheableTokens =
+    cachedItems.length > 0 ? sumTokens(cachedItems) : (cacheable.exactTokens ?? 0);
 
   return {
     inputTokens: event.metrics.tokens.input,

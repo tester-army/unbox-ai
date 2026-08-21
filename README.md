@@ -59,13 +59,21 @@ pointers to fetch full values.
 --no-open     start the server without opening a browser
 ```
 
-## Trace format
+## Trace formats
 
-unbox-ai reads gateway-style trace exports: a JSON object with `events[]` of
-`generation` entries carrying `model`, `metrics` (latency, tokens, cost),
-`available_tools`, and cumulative `messages` snapshots. Conversation resets
-inside one trace are detected and shown as segments. Adapters for other
-formats (OTel, OpenInference) are welcome contributions.
+- **Gateway exports**: a JSON object with `events[]` of `generation` entries
+  carrying `model`, `metrics` (latency, tokens, cost), `available_tools`, and
+  cumulative `messages` snapshots. Conversation resets and multi-agent
+  interleaving are detected and shown as segments.
+- **opencode session exports** (`{info, messages[{info, parts}]}`): adapted
+  automatically. Real cache read/write tokens and per-tool execution times
+  carry over. Note: opencode exports omit the system prompt and tool
+  definitions, so token attribution assigns their weight to the conversation.
+
+There is no universal AI-trace standard yet; the closest are the OpenTelemetry
+GenAI semantic conventions, OpenInference, and OpenLLMetry (all span-based).
+Adapters for those are welcome contributions - see
+`src/core/adapters/opencode.ts` for the pattern.
 
 ## Development
 
