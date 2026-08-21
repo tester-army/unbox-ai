@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { NormalizedTrace } from "@core/types";
 import { formatPercent, formatSeconds } from "@core/format";
+import { TimelineList } from "@/components/TimelineList";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Section } from "@/components/ui/section";
@@ -20,7 +22,11 @@ interface ReplayBarProps {
  * and the bottom strip splits its input into repeated prefix vs fresh tokens.
  */
 export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarProps) {
-  const { total, starts } = replay;
+  const { total } = replay;
+  const [view, setView] = useState<"timeline" | "lanes">("timeline");
+  const step = tickStep(total);
+  const ticks: number[] = [];
+  for (let t = step; t < total; t += step) ticks.push(t);
 
   return (
     <Section
@@ -44,6 +50,12 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
               ))}
             </TabsList>
           </Tabs>
+          <Tabs value={view} onValueChange={setView}>
+            <TabsList>
+              <TabsTrigger value="timeline">timeline</TabsTrigger>
+              <TabsTrigger value="lanes">lanes</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </>
       }
     >
@@ -52,6 +64,14 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
           <p className="type-accent-s border border-ta-grey-400 px-3 py-2 text-ta-grey-200">
             no latency data in this trace
           </p>
+        ) : view === "timeline" ? (
+          <TimelineList
+            trace={trace}
+            replay={replay}
+            selectedIndex={selectedIndex}
+            onSelect={onSelect}
+            ticks={ticks}
+          />
         ) : (
           <Lanes
             trace={trace}
