@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { NormalizedTrace } from "@core/types";
+
+export const SPEEDS = [1, 4, 16];
 
 export interface Replay {
   playing: boolean;
@@ -7,6 +9,8 @@ export interface Replay {
   /** Model-time seconds elapsed on the replay clock. */
   elapsed: number;
   total: number;
+  /** Start offset of each generation on the model-time axis. */
+  starts: number[];
   /** Generation the playhead is currently inside. */
   currentIndex: number;
   toggle: () => void;
@@ -18,17 +22,13 @@ export interface Replay {
 
 /**
  * Replays the trace on a model-time clock: latencies play back at a chosen
- * speed and the entered generation is reported so the UI can follow along.
+ * speed. Callers follow the playhead by watching currentIndex while playing.
  */
-export function useReplay(
-  trace: NormalizedTrace,
-  onGenerationEnter: (index: number) => void,
-): Replay {
+export function useReplay(trace: NormalizedTrace): Replay {
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(4);
+  const [speed, setSpeed] = useState(SPEEDS[1]!);
   const [elapsed, setElapsed] = useState(0);
 
-  // start offset of each generation on the model-time axis
   const starts = useMemo(() => {
     const acc: number[] = [];
     let t = 0;
@@ -63,18 +63,12 @@ export function useReplay(
     if (playing && elapsed >= total) setPlaying(false);
   }, [playing, elapsed, total]);
 
-  // follow the playhead: select each generation as the clock enters it
-  const enter = useRef(onGenerationEnter);
-  enter.current = onGenerationEnter;
-  useEffect(() => {
-    if (playing) enter.current(currentIndex);
-  }, [playing, currentIndex]);
-
   return {
     playing,
     speed,
     elapsed,
     total,
+    starts,
     currentIndex,
     toggle: () => {
       if (!playing && elapsed >= total) setElapsed(0);

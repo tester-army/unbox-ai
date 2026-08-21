@@ -1,6 +1,11 @@
+import { formatPercent } from "../../core/format";
 import { toolCallNames } from "../../core/normalize";
 import type { LoadedTrace } from "../load";
 import { formatCost, formatSeconds, formatTokens, printJson } from "../output";
+
+function cacheableSum(loaded: LoadedTrace): number {
+  return loaded.trace.generations.reduce((acc, g) => acc + g.breakdown.cacheableTokens, 0);
+}
 
 /** Prints trace totals plus a one-liner per generation. */
 export function summary(loaded: LoadedTrace, json: boolean): void {
@@ -14,6 +19,7 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
       generations: trace.generations.length,
       segments: trace.segmentCount,
       totalTokens: trace.totalTokens,
+      cacheableTokens: cacheableSum(loaded),
       totalCost: trace.totalCost,
       totalLatency: trace.totalLatency,
     });
@@ -27,11 +33,9 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
       `${formatTokens(trace.totalTokens.input)} in / ${formatTokens(trace.totalTokens.output)} out, ` +
       `${formatCost(trace.totalCost)}, ${formatSeconds(trace.totalLatency)} model time`,
   );
-  const cacheable = trace.generations.reduce((acc, g) => acc + g.breakdown.cacheableTokens, 0);
-  const inputSum = trace.generations.reduce((acc, g) => acc + g.metrics.inputTokens, 0);
   console.log(
-    `caching   est ~${Math.round((cacheable / Math.max(inputSum, 1)) * 100)}% of input tokens ` +
-      `were identical prefix resends (cache-eligible)`,
+    `caching   ${formatPercent(cacheableSum(loaded), trace.totalTokens.input)} of input tokens ` +
+      `were a repeated prefix within a segment (cache-eligible)`,
   );
   console.log("");
   for (const gen of trace.generations) {

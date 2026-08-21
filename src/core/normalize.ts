@@ -26,9 +26,13 @@ export function normalizeTrace(raw: RawTrace): NormalizedTrace {
   // Pair per segment: a call made in generation N gets its result from N+1's
   // snapshot, and a segment reset may legitimately reuse tool call ids
   const pairing = collectPairing(raw.events, positions);
-  const generations = raw.events.map((event, index) =>
-    normalizeEvent(event, index, positions[index]!, pairing),
-  );
+  const generations = raw.events.map((event, index) => {
+    // a continued conversation resends the previous request verbatim, so the
+    // cache-eligible prefix is exactly the previous request's reported input
+    const cacheableTokens =
+      positions[index]!.carried > 0 ? raw.events[index - 1]!.metrics.tokens.input : 0;
+    return normalizeEvent(event, index, positions[index]!, pairing, cacheableTokens);
+  });
   const segment = positions.at(-1)?.segment ?? 0;
 
   return {
@@ -99,6 +103,7 @@ function normalizeEvent(
   index: number,
   { segment, carried }: EventPosition,
   pairing: Pairing,
+  cacheableTokens: number,
 ): Generation {
   const rawNew = event.messages.length - carried;
   const newMessages = event.messages
@@ -125,7 +130,7 @@ function normalizeEvent(
     carriedMessages: carried,
     foldedResults: rawNew - newMessages.length,
     newMessages,
-    breakdown: buildBreakdown(event, segment, carried),
+    breakdown: buildBreakdown(event, segment, cacheableTokens),
   };
 }
 
@@ -234,7 +239,7 @@ function messageChars(message: RawMessage): number {
 function buildBreakdown(
   event: RawEvent,
   segment: number,
-  carried: number,
+  cacheableTokens: number,
 ): {
   inputTokens: number;
   outputTokens: number;
@@ -244,7 +249,6 @@ function buildBreakdown(
   const inputMessages = withoutResponse(event.messages);
   const system: BreakdownItem[] = [];
   const conversation: BreakdownItem[] = [];
-  const carriedItems: BreakdownItem[] = [];
 
   inputMessages.forEach((message, index) => {
     const role = normalizeRole(message.role);
@@ -259,7 +263,6 @@ function buildBreakdown(
       preview: preview(message),
     };
     (role === "system" ? system : conversation).push(item);
-    if (index < carried) carriedItems.push(item);
   });
 
   const tools: BreakdownItem[] = (event.available_tools ?? []).map((tool) => {
@@ -280,11 +283,6 @@ function buildBreakdown(
     { key: "tools", estTokens: sumTokens(tools), items: tools },
     { key: "conversation", estTokens: sumTokens(conversation), items: conversation },
   ];
-  // A continued conversation resends the previous request verbatim: tool
-  // definitions plus every carried message form an identical, cacheable prefix
-  const cacheableTokens =
-    carried > 0 ? sumTokens(tools) + sumTokens(carriedItems) : 0;
-
   return {
     inputTokens: event.metrics.tokens.input,
     outputTokens: event.metrics.tokens.output,

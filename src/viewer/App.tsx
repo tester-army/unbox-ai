@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { NormalizedTrace } from "@core/types";
 import { GenerationDetail } from "@/components/GenerationDetail";
 import { Header } from "@/components/Header";
 import { ReplayBar } from "@/components/ReplayBar";
@@ -30,13 +31,19 @@ export function App() {
 }
 
 interface LoadedProps {
-  trace: NonNullable<ReturnType<typeof useTrace>["trace"]>;
+  trace: NormalizedTrace;
   selectedIndex: number;
   onSelect: (index: number) => void;
 }
 
 function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
-  const replay = useReplay(trace, onSelect);
+  const replay = useReplay(trace);
+
+  // follow the playhead: the entered generation becomes the selection
+  useEffect(() => {
+    if (replay.playing) onSelect(replay.currentIndex);
+  }, [replay.playing, replay.currentIndex, onSelect]);
+
   const selected = trace.generations[selectedIndex] ?? trace.generations[0];
   if (!selected) {
     return (
@@ -46,9 +53,10 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
     );
   }
 
-  // a manual pick pauses the replay so it does not fight the user
-  const selectManually = (index: number) => {
+  // a manual pick pauses the replay and moves the clock with the selection
+  const selectGeneration = (index: number) => {
     replay.pause();
+    replay.seekToGeneration(index);
     onSelect(index);
   };
 
@@ -60,7 +68,7 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
           <Waterfall
             trace={trace}
             selectedIndex={selected.index}
-            onSelect={selectManually}
+            onSelect={selectGeneration}
           />
         </aside>
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
@@ -68,7 +76,7 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
             trace={trace}
             replay={replay}
             selectedIndex={selected.index}
-            onSelect={onSelect}
+            onSelect={selectGeneration}
           />
           <TreemapSection trace={trace} generation={selected} />
           <GenerationDetail key={selected.index} generation={selected} />

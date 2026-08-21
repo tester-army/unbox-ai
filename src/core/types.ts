@@ -106,9 +106,10 @@ export interface TokenBreakdown {
   inputTokens: number;
   outputTokens: number;
   /**
-   * Estimated input tokens that are an identical prefix of the previous
-   * request (carried messages plus tool definitions) - cache-eligible.
-   * 0 on a fresh conversation.
+   * Input tokens that are an identical prefix of the previous request -
+   * exactly the previous request's reported input - and therefore
+   * cache-eligible. 0 on a segment start, which is conservative: the system
+   * prompt and tool definitions may still prefix-match across segments.
    */
   cacheableTokens: number;
   groups: BreakdownGroup[];
