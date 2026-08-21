@@ -98,6 +98,15 @@ export function toolCallNames(gen: Generation): string[] {
   return gen.newMessages.flatMap((m) => m.toolCalls?.map((c) => c.name) ?? []);
 }
 
+/** Every tool call in the trace, in order, tagged with its generation index. */
+export function allToolCalls(
+  trace: NormalizedTrace,
+): (PairedToolCall & { gen: number })[] {
+  return trace.generations.flatMap((gen) =>
+    gen.newMessages.flatMap((m) => (m.toolCalls ?? []).map((call) => ({ ...call, gen: gen.index }))),
+  );
+}
+
 function normalizeEvent(
   event: RawEvent,
   index: number,
@@ -200,12 +209,17 @@ function normalizeMessage(
   };
 }
 
-/** Pulls execution time and success out of result payloads that report them. */
+/**
+ * Pulls execution time and success out of result payloads that report them.
+ * Convention from the tester.army tool runtime: results serialized as
+ * {"type":"json","value":{...,"tMs":<ms>,"success":<bool>}}.
+ */
 function resultMeta(text: string): Pick<PairedToolCall, "durationMs" | "success"> {
   try {
     const value = (JSON.parse(text) as { value?: { tMs?: unknown; success?: unknown } }).value;
+    const tMs = value?.tMs;
     return {
-      ...(typeof value?.tMs === "number" ? { durationMs: value.tMs } : {}),
+      ...(typeof tMs === "number" && Number.isFinite(tMs) && tMs >= 0 ? { durationMs: tMs } : {}),
       ...(typeof value?.success === "boolean" ? { success: value.success } : {}),
     };
   } catch {

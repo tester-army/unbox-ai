@@ -1,10 +1,9 @@
-import type { NormalizedTrace, PairedToolCall } from "@core/types";
+import type { NormalizedTrace } from "@core/types";
+import { allToolCalls } from "@core/normalize";
 import { formatCompact, formatMs } from "@core/format";
 import { cn } from "@/lib/utils";
 
-interface ToolCallRow extends PairedToolCall {
-  gen: number;
-}
+const GRID = "grid grid-cols-[3rem_minmax(8rem,1fr)_4rem_5rem_4rem_minmax(6rem,2fr)] gap-x-4";
 
 interface ToolCallsSectionProps {
   trace: NormalizedTrace;
@@ -14,9 +13,7 @@ interface ToolCallsSectionProps {
 
 /** Every tool call in the run, network-inspector style. Click a row to jump to its generation. */
 export function ToolCallsSection({ trace, selectedIndex, onSelect }: ToolCallsSectionProps) {
-  const rows: ToolCallRow[] = trace.generations.flatMap((gen) =>
-    gen.newMessages.flatMap((m) => (m.toolCalls ?? []).map((call) => ({ ...call, gen: gen.index }))),
-  );
+  const rows = allToolCalls(trace);
   if (rows.length === 0) return null;
   const maxDuration = Math.max(...rows.map((row) => row.durationMs ?? 0), 1);
 
@@ -26,35 +23,45 @@ export function ToolCallsSection({ trace, selectedIndex, onSelect }: ToolCallsSe
         <h2 className="type-accent-m text-ta-sand-50">tool calls</h2>
         <span className="type-accent-s text-ta-grey-200">{rows.length} calls</span>
       </div>
-      <div className="type-accent-s px-6 pb-4">
-        <div className="grid grid-cols-[3rem_minmax(8rem,1fr)_4rem_5rem_4rem_minmax(6rem,2fr)] gap-x-4 border-b border-ta-grey-400 pb-1 text-ta-grey-200">
-          <span>gen</span>
-          <span>name</span>
-          <span>status</span>
-          <span className="text-right">time</span>
-          <span className="text-right">size</span>
-          <span>waterfall</span>
+      <div className="type-accent-s max-h-80 overflow-x-auto overflow-y-auto px-6 pb-4" role="table">
+        <div className={cn(GRID, "border-b border-ta-grey-400 pb-1 text-ta-grey-200")} role="row">
+          <span role="columnheader">gen</span>
+          <span role="columnheader">name</span>
+          <span role="columnheader">status</span>
+          <span role="columnheader" className="text-right">
+            time
+          </span>
+          <span role="columnheader" className="text-right" title="result chars">
+            size
+          </span>
+          <span role="columnheader">waterfall</span>
         </div>
         {rows.map((row) => (
           <button
-            key={row.id}
+            key={`${row.gen}:${row.id}`}
+            role="row"
             onClick={() => onSelect(row.gen)}
             aria-pressed={row.gen === selectedIndex}
             className={cn(
-              "grid w-full cursor-pointer grid-cols-[3rem_minmax(8rem,1fr)_4rem_5rem_4rem_minmax(6rem,2fr)] items-center gap-x-4 border-b border-ta-grey-450 py-1 text-left transition-colors hover:bg-ta-grey-450",
+              GRID,
+              "w-full cursor-pointer items-center border-b border-ta-grey-450 py-1 text-left transition-colors hover:bg-ta-grey-450",
               row.gen === selectedIndex && "bg-ta-grey-450",
             )}
           >
-            <span className="text-ta-grey-200">[{row.gen}]</span>
-            <span className="truncate text-ta-sand-50">{row.name}</span>
+            <span role="cell" className="text-ta-grey-200">
+              [{row.gen}]
+            </span>
+            <span role="cell" className="truncate text-ta-sand-50">
+              {row.name}
+            </span>
             <Status success={row.success} hasResult={row.result !== undefined} />
-            <span className="text-right text-ta-grey-100">
+            <span role="cell" className="text-right text-ta-grey-100">
               {row.durationMs !== undefined ? formatMs(row.durationMs) : "-"}
             </span>
-            <span className="text-right text-ta-grey-200">
+            <span role="cell" className="text-right text-ta-grey-200" title="result chars">
               {row.result !== undefined ? formatCompact(row.result.length) : "-"}
             </span>
-            <span className="relative h-2 bg-ta-grey-450">
+            <span role="cell" className="relative h-2 bg-ta-grey-450">
               {row.durationMs !== undefined && (
                 <span
                   className={cn(
@@ -73,7 +80,21 @@ export function ToolCallsSection({ trace, selectedIndex, onSelect }: ToolCallsSe
 }
 
 function Status({ success, hasResult }: { success?: boolean; hasResult: boolean }) {
-  if (success === false) return <span className="text-ta-error">failed</span>;
-  if (success === true) return <span className="text-ta-grey-100">ok</span>;
-  return <span className="text-ta-grey-200">{hasResult ? "done" : "-"}</span>;
+  if (success === false)
+    return (
+      <span role="cell" className="truncate text-ta-error">
+        failed
+      </span>
+    );
+  if (success === true)
+    return (
+      <span role="cell" className="text-ta-grey-100">
+        ok
+      </span>
+    );
+  return (
+    <span role="cell" className="text-ta-grey-200">
+      {hasResult ? "done" : "-"}
+    </span>
+  );
 }

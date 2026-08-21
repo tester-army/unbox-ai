@@ -18,7 +18,7 @@ export function formatSeconds(seconds: number): string {
 /** Formats a millisecond duration: 845 -> "845ms", 7085 -> "7.09s". */
 export function formatMs(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
+  return formatSeconds(ms / 1000);
 }
 
 /** Share of a whole as a percent string: (41, 100) -> "41%". */
