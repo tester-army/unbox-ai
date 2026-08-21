@@ -27,13 +27,18 @@ export function normalizeTrace(raw: RawTrace): NormalizedTrace {
   // snapshot, and a segment reset may legitimately reuse tool call ids
   const pairing = collectPairing(raw.events, positions);
   const generations = raw.events.map((event, index) => {
-    // a continued conversation resends the previous request verbatim, so the
-    // cache-eligible prefix is exactly the previous request's reported input
-    const cacheableTokens =
-      positions[index]!.carried > 0 ? raw.events[index - 1]!.metrics.tokens.input : 0;
-    return normalizeEvent(event, index, positions[index]!, pairing, cacheableTokens);
+    const pos = positions[index]!;
+    // an unmutated continuation resends the thread predecessor's request
+    // verbatim, so its cache-eligible prefix is exactly that request's
+    // reported input; compaction breaks the cache at the first rewrite,
+    // falling back to an estimate of the still-identical leading run
+    const cacheable: CacheableSpec =
+      pos.prevIndex !== null && pos.firstMutation >= pos.carried
+        ? { exactTokens: raw.events[pos.prevIndex]!.metrics.tokens.input }
+        : { uptoMessage: pos.firstMutation };
+    return normalizeEvent(event, index, pos, pairing, cacheable);
   });
-  const segment = positions.at(-1)?.segment ?? 0;
+  const segmentCount = positions.reduce((max, p) => Math.max(max, p.segment + 1), 0);
 
   return {
     traceId: raw.trace_id,
@@ -43,7 +48,7 @@ export function normalizeTrace(raw: RawTrace): NormalizedTrace {
     totalCost: raw.total_cost,
     totalLatency: sum(generations.map((g) => g.metrics.latency)),
     models: [...new Set(generations.map((g) => g.model))],
-    segmentCount: segment + 1,
+    segmentCount,
     generations,
   };
 }
@@ -63,11 +68,10 @@ export function assertTraceShape(raw: unknown): asserts raw is RawTrace {
       typeof m?.tokens?.input !== "number" ||
       typeof m.tokens.output !== "number" ||
       typeof m.latency !== "number" ||
-      typeof m.time_to_first_token !== "number" ||
       typeof m.cost !== "number"
     ) {
       throw new Error(
-        `Unsupported trace: events[${i}] is missing metrics (latency, time_to_first_token, tokens, cost)`,
+        `Unsupported trace: events[${i}] is missing metrics (latency, tokens, cost)`,
       );
     }
   }
@@ -75,22 +79,84 @@ export function assertTraceShape(raw: unknown): asserts raw is RawTrace {
 
 interface EventPosition {
   segment: number;
-  /** Count of context messages carried over from the previous generation. */
+  /** Count of context messages carried over from the thread predecessor. */
   carried: number;
+  /** Index of the event this one continues, when it continues one. */
+  prevIndex: number | null;
+  /**
+   * First carried message whose content was rewritten in place (context
+   * compaction). Equals carried when the whole prefix is byte-identical.
+   */
+  firstMutation: number;
 }
 
-/** Splits events into conversation segments and computes each event's carried prefix. */
+/**
+ * Groups events into conversation threads (segments). Traces interleave
+ * agents, so each event is matched against the latest event with the same
+ * name; compatibility is structural (roles and tool call ids), tolerating
+ * in-place "[compacted]" rewrites of older messages.
+ */
 function assignSegments(events: RawEvent[]): EventPosition[] {
   const positions: EventPosition[] = [];
-  let segment = 0;
-  let prev: RawEvent | undefined;
-  for (const event of events) {
-    const continuesPrev = prev !== undefined && isPrefix(prev.messages, event.messages);
-    if (prev !== undefined && !continuesPrev) segment += 1;
-    positions.push({ segment, carried: continuesPrev && prev ? prev.messages.length : 0 });
-    prev = event;
-  }
+  let segments = 0;
+  events.forEach((event, i) => {
+    let found: EventPosition | null = null;
+    for (let j = i - 1; j >= 0; j--) {
+      if (events[j]!.name !== event.name) continue;
+      // only the latest same-name event can be the thread tail
+      const firstMutation = continuationOf(events[j]!.messages, event.messages);
+      if (firstMutation !== null) {
+        found = {
+          segment: positions[j]!.segment,
+          carried: events[j]!.messages.length,
+          prevIndex: j,
+          firstMutation,
+        };
+      }
+      break;
+    }
+    positions.push(
+      found ?? { segment: segments++, carried: 0, prevIndex: null, firstMutation: 0 },
+    );
+  });
   return positions;
+}
+
+/**
+ * Returns the index of the first compacted (mutated) carried message when
+ * next continues prev's conversation, prev.length when the prefix is exact,
+ * or null when it is a different conversation.
+ */
+function continuationOf(prev: RawMessage[], next: RawMessage[]): number | null {
+  if (prev.length > next.length) return null;
+  let firstMutation = prev.length;
+  for (let k = 0; k < prev.length; k++) {
+    const a = prev[k]!;
+    const b = next[k]!;
+    if (deepEqual(a, b)) continue;
+    const structurallySame =
+      a.role === b.role &&
+      a.tool_call_id === b.tool_call_id &&
+      deepEqual(a.tool_calls?.map((c) => c.id), b.tool_calls?.map((c) => c.id));
+    if (structurallySame && isCompacted(b)) {
+      firstMutation = Math.min(firstMutation, k);
+      continue;
+    }
+    return null;
+  }
+  return firstMutation;
+}
+
+/** True for messages the runtime replaced with a "[compacted] ..." summary. */
+function isCompacted(message: RawMessage): boolean {
+  const text = contentToText(message.content);
+  if (text.startsWith("[compacted]")) return true;
+  try {
+    const value = (JSON.parse(text) as { value?: unknown }).value;
+    return typeof value === "string" && value.startsWith("[compacted]");
+  } catch {
+    return false;
+  }
 }
 
 /** Names of the tool calls a generation's new messages make, in order. */
@@ -107,12 +173,18 @@ export function allToolCalls(
   );
 }
 
+/** Exact cacheable prefix tokens, or the message index the estimate runs up to. */
+interface CacheableSpec {
+  exactTokens?: number;
+  uptoMessage?: number;
+}
+
 function normalizeEvent(
   event: RawEvent,
   index: number,
   { segment, carried }: EventPosition,
   pairing: Pairing,
-  cacheableTokens: number,
+  cacheable: CacheableSpec,
 ): Generation {
   const rawNew = event.messages.length - carried;
   const newMessages = event.messages
@@ -130,7 +202,9 @@ function normalizeEvent(
     provider: event.provider,
     metrics: {
       latency: event.metrics.latency,
-      timeToFirstToken: event.metrics.time_to_first_token,
+      ...(event.metrics.time_to_first_token !== undefined
+        ? { timeToFirstToken: event.metrics.time_to_first_token }
+        : {}),
       inputTokens: event.metrics.tokens.input,
       outputTokens: event.metrics.tokens.output,
       cost: event.metrics.cost,
@@ -139,14 +213,8 @@ function normalizeEvent(
     carriedMessages: carried,
     foldedResults: rawNew - newMessages.length,
     newMessages,
-    breakdown: buildBreakdown(event, segment, cacheableTokens),
+    breakdown: buildBreakdown(event, segment, cacheable),
   };
-}
-
-/** True when prev is an exact element-wise prefix of next (same conversation, grown). */
-function isPrefix(prev: RawMessage[], next: RawMessage[]): boolean {
-  if (prev.length > next.length) return false;
-  return prev.every((message, i) => deepEqual(message, next[i]));
 }
 
 interface ToolResult {
@@ -266,7 +334,7 @@ function messageChars(message: RawMessage): number {
 function buildBreakdown(
   event: RawEvent,
   segment: number,
-  cacheableTokens: number,
+  cacheable: CacheableSpec,
 ): {
   inputTokens: number;
   outputTokens: number;
@@ -276,6 +344,7 @@ function buildBreakdown(
   const inputMessages = withoutResponse(event.messages);
   const system: BreakdownItem[] = [];
   const conversation: BreakdownItem[] = [];
+  const cacheableItems: BreakdownItem[] = [];
 
   inputMessages.forEach((message, index) => {
     const role = normalizeRole(message.role);
@@ -290,6 +359,9 @@ function buildBreakdown(
       preview: preview(message),
     };
     (role === "system" ? system : conversation).push(item);
+    if (cacheable.uptoMessage !== undefined && index < cacheable.uptoMessage) {
+      cacheableItems.push(item);
+    }
   });
 
   const tools: BreakdownItem[] = (event.available_tools ?? []).map((tool) => {
@@ -310,6 +382,10 @@ function buildBreakdown(
     { key: "tools", estTokens: sumTokens(tools), items: tools },
     { key: "conversation", estTokens: sumTokens(conversation), items: conversation },
   ];
+  const cacheableTokens =
+    cacheable.exactTokens ??
+    (cacheableItems.length > 0 ? sumTokens(tools) + sumTokens(cacheableItems) : 0);
+
   return {
     inputTokens: event.metrics.tokens.input,
     outputTokens: event.metrics.tokens.output,

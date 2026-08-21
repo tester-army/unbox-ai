@@ -22,10 +22,11 @@ export function event(loaded: LoadedTrace, index: number, json: boolean): void {
     return;
   }
   const m = gen.metrics;
+  const ttft = m.timeToFirstToken !== undefined ? ` (ttft ${formatSeconds(m.timeToFirstToken)})` : "";
   console.log(
     `generation ${gen.index}  seg ${gen.segment}  ${gen.model}  ` +
       `${formatTokens(m.inputTokens)} in / ${formatTokens(m.outputTokens)} out  ` +
-      `${formatSeconds(m.latency)} (ttft ${formatSeconds(m.timeToFirstToken)})  ${formatCost(m.cost)}`,
+      `${formatSeconds(m.latency)}${ttft}  ${formatCost(m.cost)}`,
   );
   const byGroup = gen.breakdown.groups
     .map((g) => `${g.key} ~${formatTokens(g.estTokens)}`)

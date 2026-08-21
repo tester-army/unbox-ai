@@ -15,7 +15,7 @@ export interface RawEvent {
   provider: string;
   metrics: {
     latency: number;
-    time_to_first_token: number;
+    time_to_first_token?: number;
     tokens: { input: number; output: number };
     cost: number;
   };
@@ -65,7 +65,8 @@ export interface Generation {
   provider: string;
   metrics: {
     latency: number;
-    timeToFirstToken: number;
+    /** Absent when the trace does not report it. */
+    timeToFirstToken?: number;
     inputTokens: number;
     outputTokens: number;
     cost: number;

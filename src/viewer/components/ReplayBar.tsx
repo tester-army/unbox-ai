@@ -50,7 +50,10 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
           <div className="relative h-16 w-full border border-ta-grey-400 bg-ta-grey-500">
             {trace.generations.map((gen) => {
               const { latency, timeToFirstToken } = gen.metrics;
-              const ttftShare = latency > 0 ? Math.min(timeToFirstToken / latency, 1) : 0;
+              const ttftShare =
+                latency > 0 && timeToFirstToken !== undefined
+                  ? Math.min(timeToFirstToken / latency, 1)
+                  : 0;
               const { inputTokens, cacheableTokens } = gen.breakdown;
               const cacheShare = inputTokens > 0 ? cacheableTokens / inputTokens : 0;
               const selected = gen.index === selectedIndex;
@@ -59,9 +62,9 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
                   key={gen.index}
                   onClick={() => onSelect(gen.index)}
                   aria-pressed={selected}
-                  title={`[${gen.index}] ${formatSeconds(latency)}, ttft ${formatSeconds(
-                    timeToFirstToken,
-                  )}, ${formatPercent(cacheableTokens, inputTokens)} repeated prefix`}
+                  title={`[${gen.index}] ${formatSeconds(latency)}${
+                    timeToFirstToken !== undefined ? `, ttft ${formatSeconds(timeToFirstToken)}` : ""
+                  }, ${formatPercent(cacheableTokens, inputTokens)} repeated prefix`}
                   className={cn(
                     "absolute inset-y-0 cursor-pointer overflow-hidden border-r border-ta-grey-500",
                     selected ? "bg-ta-grey-300/60" : "bg-ta-grey-450 hover:bg-ta-grey-300/40",

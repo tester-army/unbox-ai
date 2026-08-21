@@ -11,7 +11,8 @@ export function GenerationDetail({ generation }: { generation: Generation }) {
         <h2 className="type-accent-m text-ta-sand-50">generation {generation.index}</h2>
         <span className="type-accent-s text-ta-grey-200">
           {generation.model} · {formatTokens(m.inputTokens)} in / {formatTokens(m.outputTokens)}{" "}
-          out · {formatSeconds(m.latency)} (ttft {formatSeconds(m.timeToFirstToken)}) ·{" "}
+          out · {formatSeconds(m.latency)}
+          {m.timeToFirstToken !== undefined && ` (ttft ${formatSeconds(m.timeToFirstToken)})`} ·{" "}
           {formatCost(m.cost)} · {generation.toolCount} tools
         </span>
       </div>
@@ -21,8 +22,8 @@ export function GenerationDetail({ generation }: { generation: Generation }) {
           : `fresh conversation (segment ${generation.segment}), ${generation.newMessages.length} messages`}
         {generation.breakdown.cacheableTokens > 0 &&
           ` · ${formatPercent(generation.breakdown.cacheableTokens, generation.metrics.inputTokens)} repeated prefix`}
-        {" · ttft "}
-        {formatPercent(generation.metrics.timeToFirstToken, generation.metrics.latency)} of latency
+        {generation.metrics.timeToFirstToken !== undefined &&
+          ` · ttft ${formatPercent(generation.metrics.timeToFirstToken, generation.metrics.latency)} of latency`}
       </p>
       <div className="flex flex-col gap-2">
         {generation.newMessages.map((message) => (
