@@ -3,6 +3,7 @@ import { contentToText } from "@core/normalize";
 import type { RawMessage, RawToolDef } from "@core/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Markdown } from "@/components/ui/markdown";
 import { prettyArgs, prettyPayload } from "@/lib/pretty";
 import type { TreemapLeaf } from "@/lib/treemap-data";
 
@@ -60,6 +61,11 @@ interface SchemaProperty {
   enum?: unknown[];
 }
 
+/** Markdown structure worth rendering: headings, list runs, bold, or fenced code. */
+function looksLikeMarkdown(text: string): boolean {
+  return /^#{1,4} |^```|^- |^\d+\. |\*\*[^*]+\*\*/m.test(text);
+}
+
 function ToolDefinition({ tool }: { tool: RawToolDef }) {
   const schema = tool.inputSchema as
     | { properties?: Record<string, SchemaProperty>; required?: string[] }
@@ -106,7 +112,9 @@ function MessageDefinition({ message }: { message: RawMessage }) {
   const text = prettyPayload(contentToText(message.content));
   return (
     <div className="flex flex-col gap-5">
-      {text && <p className="type-body-m whitespace-pre-wrap text-ta-grey-100">{text}</p>}
+      {text && (looksLikeMarkdown(text) ? <Markdown>{text}</Markdown> : (
+        <p className="type-body-m whitespace-pre-wrap text-ta-grey-100">{text}</p>
+      ))}
       {message.tool_calls?.map((call) => (
         <div key={call.id} className="border-l-2 border-ta-orange-300 bg-ta-grey-450 px-4 py-3">
           <p className="type-accent-s text-ta-orange-75">{call.function.name}</p>
