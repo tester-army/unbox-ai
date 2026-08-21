@@ -1,5 +1,5 @@
 import type { Generation } from "@core/types";
-import { formatCost, formatSeconds, formatTokens } from "@core/format";
+import { formatCost, formatPercent, formatSeconds, formatTokens } from "@core/format";
 import { MessageCard } from "@/components/MessageCard";
 
 /** The selected generation: metrics line plus its new-vs-previous messages. */
@@ -15,6 +15,13 @@ export function GenerationDetail({ generation }: { generation: Generation }) {
           {formatCost(m.cost)} · {generation.toolCount} tools
         </span>
       </div>
+      <p className="type-accent-s text-ta-grey-200">
+        {generation.breakdown.cacheableTokens > 0
+          ? `~${formatPercent(generation.breakdown.cacheableTokens, generation.metrics.inputTokens)} of input is a repeated prefix (cache-eligible) · `
+          : ""}
+        ttft is {formatPercent(generation.metrics.timeToFirstToken, generation.metrics.latency)}{" "}
+        of latency
+      </p>
       <p className="type-accent-s text-ta-grey-200">
         {generation.carriedMessages > 0
           ? `${generation.carriedMessages} messages carried from previous generations - showing the ${generation.newMessages.length} new`

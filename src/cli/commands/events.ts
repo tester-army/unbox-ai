@@ -14,6 +14,7 @@ export function events(loaded: LoadedTrace, json: boolean): void {
         ...gen.metrics,
         toolCount: gen.toolCount,
         newMessages: gen.newMessages.length,
+        cacheableTokens: gen.breakdown.cacheableTokens,
         toolCalls: toolCallNames(gen),
       })),
     );

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { GenerationDetail } from "@/components/GenerationDetail";
 import { Header } from "@/components/Header";
+import { ReplayBar } from "@/components/ReplayBar";
 import { TreemapSection } from "@/components/TreemapSection";
 import { Waterfall } from "@/components/Waterfall";
+import { useReplay } from "@/lib/use-replay";
 import { useTrace } from "@/lib/use-trace";
 
 export function App() {
@@ -24,6 +26,17 @@ export function App() {
     );
   }
 
+  return <Loaded trace={trace} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />;
+}
+
+interface LoadedProps {
+  trace: NonNullable<ReturnType<typeof useTrace>["trace"]>;
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+}
+
+function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
+  const replay = useReplay(trace, onSelect);
   const selected = trace.generations[selectedIndex] ?? trace.generations[0];
   if (!selected) {
     return (
@@ -33,6 +46,12 @@ export function App() {
     );
   }
 
+  // a manual pick pauses the replay so it does not fight the user
+  const selectManually = (index: number) => {
+    replay.pause();
+    onSelect(index);
+  };
+
   return (
     <Shell>
       <Header trace={trace} />
@@ -41,10 +60,16 @@ export function App() {
           <Waterfall
             trace={trace}
             selectedIndex={selected.index}
-            onSelect={setSelectedIndex}
+            onSelect={selectManually}
           />
         </aside>
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+          <ReplayBar
+            trace={trace}
+            replay={replay}
+            selectedIndex={selected.index}
+            onSelect={onSelect}
+          />
           <TreemapSection trace={trace} generation={selected} />
           <GenerationDetail key={selected.index} generation={selected} />
         </main>

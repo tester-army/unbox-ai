@@ -105,6 +105,12 @@ export interface PairedToolCall {
 export interface TokenBreakdown {
   inputTokens: number;
   outputTokens: number;
+  /**
+   * Estimated input tokens that are an identical prefix of the previous
+   * request (carried messages plus tool definitions) - cache-eligible.
+   * 0 on a fresh conversation.
+   */
+  cacheableTokens: number;
   groups: BreakdownGroup[];
 }
 

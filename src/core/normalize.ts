@@ -125,7 +125,7 @@ function normalizeEvent(
     carriedMessages: carried,
     foldedResults: rawNew - newMessages.length,
     newMessages,
-    breakdown: buildBreakdown(event, segment),
+    breakdown: buildBreakdown(event, segment, carried),
   };
 }
 
@@ -231,14 +231,20 @@ function messageChars(message: RawMessage): number {
  * counts. The response (final assistant message) is excluded - it is the
  * output, not the input.
  */
-function buildBreakdown(event: RawEvent, segment: number): {
+function buildBreakdown(
+  event: RawEvent,
+  segment: number,
+  carried: number,
+): {
   inputTokens: number;
   outputTokens: number;
+  cacheableTokens: number;
   groups: BreakdownGroup[];
 } {
   const inputMessages = withoutResponse(event.messages);
   const system: BreakdownItem[] = [];
   const conversation: BreakdownItem[] = [];
+  const carriedItems: BreakdownItem[] = [];
 
   inputMessages.forEach((message, index) => {
     const role = normalizeRole(message.role);
@@ -253,6 +259,7 @@ function buildBreakdown(event: RawEvent, segment: number): {
       preview: preview(message),
     };
     (role === "system" ? system : conversation).push(item);
+    if (index < carried) carriedItems.push(item);
   });
 
   const tools: BreakdownItem[] = (event.available_tools ?? []).map((tool) => {
@@ -273,9 +280,15 @@ function buildBreakdown(event: RawEvent, segment: number): {
     { key: "tools", estTokens: sumTokens(tools), items: tools },
     { key: "conversation", estTokens: sumTokens(conversation), items: conversation },
   ];
+  // A continued conversation resends the previous request verbatim: tool
+  // definitions plus every carried message form an identical, cacheable prefix
+  const cacheableTokens =
+    carried > 0 ? sumTokens(tools) + sumTokens(carriedItems) : 0;
+
   return {
     inputTokens: event.metrics.tokens.input,
     outputTokens: event.metrics.tokens.output,
+    cacheableTokens,
     groups,
   };
 }
