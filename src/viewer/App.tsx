@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { NormalizedTrace } from "@core/types";
 import { GenerationDetail } from "@/components/GenerationDetail";
 import { Header } from "@/components/Header";
+import { InsightsSection } from "@/components/InsightsSection";
 import { ReplayBar } from "@/components/ReplayBar";
 import { ToolCallsSection } from "@/components/ToolCallsSection";
 import { TreemapSection } from "@/components/TreemapSection";
@@ -85,6 +86,7 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
             selectedIndex={selected.index}
             onSelect={selectGeneration}
           />
+          <InsightsSection trace={trace} onSelect={selectGeneration} />
           <GenerationDetail key={selected.index} generation={selected} />
         </main>
       </div>

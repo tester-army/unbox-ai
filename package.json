@@ -35,7 +35,6 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {},
   "devDependencies": {
     "@base-ui-components/react": "1.0.0-rc.0",
     "@tailwindcss/vite": "4.3.3",
@@ -48,6 +47,7 @@
     "d3-hierarchy": "3.1.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "recharts": "^3.10.1",
     "tailwind-merge": "3.6.0",
     "tailwindcss": "4.3.3",
     "tsup": "8.5.1",
