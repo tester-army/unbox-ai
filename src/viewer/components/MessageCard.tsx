@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Message, MessageRole } from "@core/types";
 import { formatCompact, formatTokens } from "@core/format";
 import { Button } from "@/components/ui/button";
+import { prettyArgs, prettyPayload } from "@/lib/pretty";
 import { cn } from "@/lib/utils";
 
 const COLLAPSED_CHARS = 700;
@@ -62,19 +63,22 @@ export function MessageCard({ message }: { message: Message }) {
 
 function ToolCall({ name, args, result }: { name: string; args: unknown; result?: string }) {
   const [open, setOpen] = useState(false);
-  const short = result !== undefined && result.length <= RESULT_PREVIEW_CHARS;
+  const pretty = result !== undefined ? prettyPayload(result) : undefined;
+  const short = pretty !== undefined && pretty.length <= RESULT_PREVIEW_CHARS;
   return (
     <div className="mt-2 border-l-2 border-ta-orange-300 bg-ta-grey-500 px-3 py-2">
-      <p className="type-accent-s text-ta-orange-75">
-        {name}
-        <span className="normal-case text-ta-grey-100"> {JSON.stringify(args)}</span>
-      </p>
-      {result !== undefined &&
+      <p className="type-accent-s text-ta-orange-75">{name}</p>
+      <pre className="type-body-s overflow-x-auto whitespace-pre-wrap font-(family-name:--font-dm-mono) text-ta-grey-100">
+        {prettyArgs(args)}
+      </pre>
+      {pretty !== undefined &&
         (short || open ? (
-          <p className="type-body-s mt-1 whitespace-pre-wrap text-ta-grey-200">{result}</p>
+          <pre className="type-body-s mt-1 overflow-x-auto whitespace-pre-wrap border-t border-ta-grey-450 pt-1 font-(family-name:--font-dm-mono) text-ta-grey-200">
+            {pretty}
+          </pre>
         ) : (
           <Button className="mt-1" onClick={() => setOpen(true)}>
-            show result ({formatCompact(result.length)} chars)
+            show result ({formatCompact(pretty.length)} chars)
           </Button>
         ))}
     </div>

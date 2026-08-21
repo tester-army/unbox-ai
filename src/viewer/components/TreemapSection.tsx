@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Generation, NormalizedTrace } from "@core/types";
 import { formatPercent, formatTokens } from "@core/format";
+import { DefinitionDialog } from "@/components/DefinitionDialog";
 import { Treemap } from "@/components/Treemap";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildTreemapData,
-  type TreemapLeaf,
   type TreemapScope,
   type TreemapSizeBy,
 } from "@/lib/treemap-data";
@@ -95,49 +93,4 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
       </div>
     </section>
   );
-}
-
-/** Full raw definition of a clicked block in a modal, fetched via /api/raw. */
-function DefinitionDialog({ leaf, onClose }: { leaf: TreemapLeaf; onClose: () => void }) {
-  const [content, setContent] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    setContent(null);
-    fetchRawValue(leaf.ref)
-      .then((value) => !cancelled && setContent(value))
-      .catch((error) => !cancelled && setContent(String(error)));
-    return () => {
-      cancelled = true;
-    };
-  }, [leaf.ref]);
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
-        <div className="flex items-baseline gap-4 border-b border-ta-grey-400 px-4 py-3">
-          <DialogTitle>{leaf.label}</DialogTitle>
-          <span className="type-accent-s text-ta-grey-200">{leaf.ref}</span>
-          <DialogClose
-            render={
-              <Button className="ml-auto border-none">close</Button>
-            }
-          />
-        </div>
-        <pre className="type-body-s min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-4 py-3 font-(family-name:--font-dm-mono) text-ta-grey-100">
-          {content ?? "loading..."}
-        </pre>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/** Fetches a raw-trace value, failing legibly when the server is older than the viewer. */
-async function fetchRawValue(ref: string): Promise<string> {
-  const res = await fetch(`/api/raw?path=${encodeURIComponent(ref)}`);
-  if (!res.headers.get("content-type")?.includes("application/json")) {
-    throw new Error("this unbox-ai server is older than the viewer - restart it and reload");
-  }
-  const body = await res.json();
-  if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
-  return typeof body.value === "string" ? body.value : JSON.stringify(body.value, null, 2);
 }
