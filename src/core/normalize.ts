@@ -333,19 +333,22 @@ function normalizeMessage(
   const toolCalls = raw.tool_calls?.map((call): PairedToolCall => {
     const key = `${segment}:${call.id}`;
     const result = pairing.results.get(key);
+    // streaming snapshots capture the newest call with empty args; a later
+    // snapshot has the completed value
+    const args = isEmptyArgs(call.function.arguments)
+      ? (pairing.args.get(key) ?? call.function.arguments)
+      : call.function.arguments;
+    const requestedWait = requestedWaitMs(call.function.name, args);
     return {
       id: call.id,
       name: call.function.name,
-      // streaming snapshots capture the newest call with empty args; a later
-      // snapshot has the completed value
-      args: isEmptyArgs(call.function.arguments)
-        ? (pairing.args.get(key) ?? call.function.arguments)
-        : call.function.arguments,
+      args,
+      ...(requestedWait !== undefined ? { durationMs: requestedWait } : {}),
       ...(result
         ? {
             result: result.text,
             resultRef: result.ref,
-            // adapter-reported metadata beats payload sniffing
+            // adapter-reported metadata beats payload sniffing beats args
             ...resultMeta(result.text),
             ...(result.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
             ...(result.success !== undefined ? { success: result.success } : {}),
@@ -378,6 +381,18 @@ function resultMeta(text: string): Pick<PairedToolCall, "durationMs" | "success"
   } catch {
     return {};
   }
+}
+
+/**
+ * Sleep-style tools (wait_for, sleep, ...) request their duration in args and
+ * runtimes rarely report it back - the requested time is the actual time.
+ * Only applies to wait/sleep-named tools; reported durations always win.
+ */
+function requestedWaitMs(name: string, args: unknown): number | undefined {
+  if (!/wait|sleep/i.test(name)) return undefined;
+  const a = args as Record<string, unknown> | null | undefined;
+  const ms = a?.timeMs ?? a?.durationMs ?? a?.ms;
+  return typeof ms === "number" && Number.isFinite(ms) && ms >= 0 ? ms : undefined;
 }
 
 function normalizeRole(role: string): MessageRole {

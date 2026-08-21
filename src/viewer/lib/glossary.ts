@@ -18,7 +18,7 @@ export const GLOSSARY = {
   "re-paid prefix":
     "Input tokens spent re-processing a system prompt and tool definitions that were already processed in an earlier conversation - paid again because each fresh conversation starts from zero.",
   "time chart":
-    "Each block is one generation, sized by its model latency. The darker left part of a block is prompt wait (TTFT). The bottom strip splits its input: grey = repeated prefix, orange = fresh. Click a block to jump; press play to replay the run.",
+    "Rows are events: generation bars sized by model latency, followed by their tool calls - drawn as bars when the trace reports execution time, dots when it does not. Drag the track to scrub, click a tool block for its input/output, press play to replay the run.",
   "context treemap":
     "Where the selected request's input tokens go: system prompt, each tool definition, and each conversation message, sized by estimated tokens. Bright blocks are fresh input; faint blocks are repeated prefix. Click a block for its full definition.",
 } as const;

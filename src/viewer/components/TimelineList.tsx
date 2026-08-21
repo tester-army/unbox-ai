@@ -24,6 +24,8 @@ type TimelineRow =
       gen: number;
       call: PairedToolCall;
       start: number;
+      /** Reported execution time in seconds; 0 renders a dot. */
+      duration: number;
       tip: string;
     };
 
@@ -72,6 +74,8 @@ export function TimelineList({
         duration: m.latency,
         tip: `generation ${gen.index} · ${formatTokens(m.inputTokens)} in / ${formatTokens(m.outputTokens)} out · ${formatCost(m.cost)}`,
       });
+      // calls execute after the generation, each taking its reported duration
+      let toolOffset = start + m.latency;
       for (const message of gen.newMessages) {
         for (const call of message.toolCalls ?? []) {
           const args = typeof call.args === "string" ? call.args : JSON.stringify(call.args);
@@ -80,11 +84,13 @@ export function TimelineList({
             key: `g${gen.index}:${call.id}`,
             gen: gen.index,
             call,
-            start: start + m.latency,
+            start: toolOffset,
+            duration: (call.durationMs ?? 0) / 1000,
             tip: `${call.name} ${args.slice(0, 300)}${
               call.durationMs !== undefined ? ` · ${formatMs(call.durationMs)}` : ""
             } · click for output`,
           });
+          toolOffset += (call.durationMs ?? 0) / 1000;
         }
       }
     });
@@ -287,14 +293,20 @@ export function TimelineList({
                   <span
                     data-block={row.key}
                     className={cn(
-                      "absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2",
+                      "absolute top-1/2 h-2.5 -translate-y-1/2",
                       row.call.success === false
                         ? "bg-ta-error"
                         : selected
                           ? "bg-ta-orange-75"
                           : "bg-ta-grey-300",
                     )}
-                    style={{ left: `${(row.start / total) * 100}%` }}
+                    style={{
+                      left: `${(row.start / total) * 100}%`,
+                      width:
+                        row.duration > 0
+                          ? `max(${(row.duration / total) * 100}%, 4px)`
+                          : "0.625rem",
+                    }}
                   />
                 ) : (
                   <span

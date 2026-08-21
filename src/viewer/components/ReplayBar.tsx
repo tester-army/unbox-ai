@@ -51,7 +51,10 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
       className="flex min-h-0 flex-1 flex-col"
       meta={
         <>
-          {formatSeconds(total)} <Hint term="model time">model time</Hint> · drag the timeline to scrub
+          {formatSeconds(trace.totalLatency)} <Hint term="model time">model time</Hint>
+          {total > trace.totalLatency &&
+            ` · ${formatSeconds(total - trace.totalLatency)} tool execution`}
+          {" · drag the timeline to scrub"}
         </>
       }
       actions={

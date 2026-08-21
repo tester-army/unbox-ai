@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import type { NormalizedTrace } from "@core/types";
+import type { Generation, NormalizedTrace } from "@core/types";
 
 export const SPEEDS = [1, 4, 8];
+
+/** Reported execution time of a generation's tool calls, in seconds. */
+export function toolSeconds(gen: Generation): number {
+  return (
+    gen.newMessages
+      .flatMap((m) => m.toolCalls ?? [])
+      .reduce((acc, call) => acc + (call.durationMs ?? 0), 0) / 1000
+  );
+}
 
 export interface Replay {
   playing: boolean;
@@ -31,16 +40,18 @@ export function useReplay(trace: NormalizedTrace): Replay {
   const [speed, setSpeed] = useState(SPEEDS[1]!);
   const [elapsed, setElapsed] = useState(0);
 
-  const starts = useMemo(() => {
+  // the axis is model time plus KNOWN tool execution time: each generation
+  // is followed by its calls' reported durations, so a 10s wait_for takes
+  // 10s of timeline (traces without durations collapse to pure model time)
+  const { starts, total } = useMemo(() => {
     const acc: number[] = [];
     let t = 0;
     for (const gen of trace.generations) {
       acc.push(t);
-      t += gen.metrics.latency;
+      t += gen.metrics.latency + toolSeconds(gen);
     }
-    return acc;
+    return { starts: acc, total: t };
   }, [trace]);
-  const total = trace.totalLatency;
 
   const currentIndex = Math.max(
     0,
