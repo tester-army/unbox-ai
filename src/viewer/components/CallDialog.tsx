@@ -4,7 +4,7 @@ import { formatMs } from "@core/format";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { prettyArgs, prettyPayload } from "@/lib/pretty";
+import { prettyArgs, prettyPayload } from "@core/pretty";
 
 interface CallDialogProps {
   call: PairedToolCall;

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Markdown } from "@/components/ui/markdown";
-import { prettyArgs, prettyPayload } from "@/lib/pretty";
+import { prettyArgs, prettyPayload } from "@core/pretty";
 import type { TreemapLeaf } from "@/lib/treemap-data";
 
 /** Full definition of a clicked treemap block: pretty-rendered, raw JSON a toggle away. */

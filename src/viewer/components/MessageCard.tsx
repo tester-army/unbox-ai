@@ -3,7 +3,7 @@ import type { Message, MessageRole } from "@core/types";
 import { formatCompact, formatTokens } from "@core/format";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
-import { prettyArgs, prettyPayload } from "@/lib/pretty";
+import { prettyArgs, prettyPayload } from "@core/pretty";
 import { cn } from "@/lib/utils";
 
 const COLLAPSED_CHARS = 700;

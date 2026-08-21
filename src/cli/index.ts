@@ -18,7 +18,7 @@ Usage:
   unbox-ai summary <trace.json>          totals + one line per generation
   unbox-ai events <trace.json>           generation table (tokens, latency, cost, tool calls)
   unbox-ai event <trace.json> <idx>      one generation: metrics, token split, new messages
-  unbox-ai tools <trace.json>            every tool call: status, time, size, args
+  unbox-ai tools <trace.json>            tool usage summary (--all for every call)
   unbox-ai messages <trace.json>         search messages (--role, --event, --grep, --limit)
   unbox-ai get <trace.json> <path>       raw value at a path, e.g. events[3].messages[2].content
 
@@ -45,6 +45,7 @@ function main(): void {
       json: { type: "boolean", default: false },
       port: { type: "string", default: "4177" },
       "no-open": { type: "boolean", default: false },
+      all: { type: "boolean", default: false },
       role: { type: "string" },
       event: { type: "string" },
       grep: { type: "string" },
@@ -87,7 +88,7 @@ function main(): void {
       event(loaded, parseIndex(arg), values.json);
       return;
     case "tools":
-      tools(loaded, values.json);
+      tools(loaded, values.json, values.all);
       return;
     case "messages":
       messages(

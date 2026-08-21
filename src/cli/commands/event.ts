@@ -1,4 +1,5 @@
 import { formatMs } from "../../core/format";
+import { prettyPayload } from "../../core/pretty";
 import type { Message } from "../../core/types";
 import { fail, type LoadedTrace } from "../load";
 import {
@@ -67,7 +68,10 @@ function printMessage(message: Message, genIndex: number): void {
         .filter(Boolean)
         .join(", ");
       const label = meta ? `result (${meta})` : "result";
-      console.log(`  ${label}: ${truncate(call.result, pointer, TOOL_FIELD_CHARS)}`);
+      // unwrap {"type":...,"value":...} envelopes so agents read content, not escapes
+      console.log(
+        `  ${label}: ${truncate(prettyPayload(call.result), pointer, TOOL_FIELD_CHARS, call.result.length)}`,
+      );
     }
   });
   console.log("");

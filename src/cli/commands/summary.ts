@@ -44,6 +44,11 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
       `latency   ${formatPercent(insights.promptWaitShare, 1)} of model time is prompt wait (ttft)`,
     );
   }
+  if (insights.prefixRepaid > 0) {
+    console.log(
+      `re-paid   ~${formatTokens(insights.prefixRepaid)} tokens re-processed at fresh conversation starts`,
+    );
+  }
   console.log("");
   for (const gen of trace.generations) {
     const calls = formatCallNames(toolCallNames(gen));
