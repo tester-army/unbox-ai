@@ -71,16 +71,20 @@ function ToolCall({ name, args, result }: { name: string; args: unknown; result?
       <pre className="type-body-s overflow-x-auto whitespace-pre-wrap font-(family-name:--font-dm-mono) text-ta-grey-100">
         {prettyArgs(args)}
       </pre>
-      {pretty !== undefined &&
-        (short || open ? (
-          <pre className="type-body-s mt-1 overflow-x-auto whitespace-pre-wrap border-t border-ta-grey-450 pt-1 font-(family-name:--font-dm-mono) text-ta-grey-200">
-            {pretty}
-          </pre>
-        ) : (
-          <Button className="mt-1" onClick={() => setOpen(true)}>
-            show result ({formatCompact(pretty.length)} chars)
-          </Button>
-        ))}
+      {pretty !== undefined && (
+        <>
+          {(short || open) && (
+            <pre className="type-body-s mt-1 max-h-96 overflow-y-auto whitespace-pre-wrap border-t border-ta-grey-450 pt-1 font-(family-name:--font-dm-mono) leading-relaxed text-ta-grey-200">
+              {pretty}
+            </pre>
+          )}
+          {!short && (
+            <Button className="mt-2" onClick={() => setOpen((v) => !v)}>
+              {open ? "hide result" : `show result (${formatCompact(pretty.length)} chars)`}
+            </Button>
+          )}
+        </>
+      )}
     </div>
   );
 }
