@@ -19,6 +19,8 @@ export interface TreemapLeaf {
   sentCount: number;
   /** Repeated cache-eligible prefix vs fresh input; undefined in cumulative scope. */
   cached?: boolean;
+  /** Raw-trace pointer to the full definition, servable via /api/raw. */
+  ref: string;
 }
 
 export interface TreemapGroupData {
@@ -66,6 +68,7 @@ export function buildTreemapData(
             estTokens: item.estTokens,
             preview: item.preview,
             sentCount: 1,
+            ref: item.ref,
             ...(scope === "generation" ? { cached: item.cached } : {}),
           });
         }

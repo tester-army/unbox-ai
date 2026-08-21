@@ -14,6 +14,20 @@ function devTraceApi(): Plugin {
     name: "unbox-dev-trace-api",
     async configureServer(server) {
       const { normalizeTrace } = await import("./src/core/normalize");
+      const { resolvePath } = await import("./src/core/path");
+      server.middlewares.use("/api/raw", (req, res) => {
+        try {
+          const raw = JSON.parse(readFileSync(process.env.UNBOX_TRACE ?? "", "utf8"));
+          const path = new URL(req.url ?? "", "http://localhost").searchParams.get("path") ?? "";
+          const value = resolvePath(raw, path);
+          res.statusCode = value === undefined ? 404 : 200;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify(value === undefined ? { error: "nothing at path" } : { value }));
+        } catch (error) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: String(error) }));
+        }
+      });
       server.middlewares.use("/api/trace", (_req, res) => {
         const sendError = (message: string) => {
           res.statusCode = 500;

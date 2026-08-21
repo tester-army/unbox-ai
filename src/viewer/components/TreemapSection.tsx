@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Generation, NormalizedTrace } from "@core/types";
 import { formatPercent, formatTokens } from "@core/format";
 import { Treemap } from "@/components/Treemap";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildTreemapData,
+  type TreemapLeaf,
   type TreemapScope,
   type TreemapSizeBy,
 } from "@/lib/treemap-data";
@@ -19,6 +21,7 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
   const [scope, setScope] = useState<TreemapScope>("generation");
   const [sizeBy, setSizeBy] = useState<TreemapSizeBy>("tokens");
   const [inspectedId, setInspectedId] = useState<string | null>(null);
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
 
   const groups = useMemo(
     () => buildTreemapData(trace, generation, scope, sizeBy),
@@ -27,7 +30,8 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
   const leaves = groups.flatMap((g) => g.leaves);
   const totalTokens = leaves.reduce((acc, l) => acc + l.estTokens, 0);
   // derived, so the inspector can never show a leaf from stale treemap data
-  const inspected = leaves.find((leaf) => leaf.id === inspectedId) ?? null;
+  const pinned = leaves.find((leaf) => leaf.id === pinnedId) ?? null;
+  const inspected = leaves.find((leaf) => leaf.id === inspectedId) ?? pinned;
 
   return (
     <section className="border-b border-ta-grey-400">
@@ -65,7 +69,11 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
         </div>
       </div>
       <div className="px-6 pb-3">
-        <Treemap groups={groups} onInspect={setInspectedId} />
+        <Treemap
+          groups={groups}
+          onInspect={setInspectedId}
+          onOpen={(id) => setPinnedId((current) => (current === id ? null : id))}
+        />
         <div className="type-accent-s mt-2 flex min-h-10 items-start gap-4 border border-ta-grey-400 bg-ta-grey-450 px-3 py-2 text-ta-grey-100">
           {inspected ? (
             <>
@@ -81,10 +89,50 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
               </span>
             </>
           ) : (
-            <span className="text-ta-grey-200">hover a block to inspect it</span>
+            <span className="text-ta-grey-200">hover a block to inspect it · click to pin its full definition</span>
           )}
         </div>
+        {pinned && <DefinitionPanel leaf={pinned} onClose={() => setPinnedId(null)} />}
       </div>
     </section>
+  );
+}
+
+/** Full raw definition of a pinned block, fetched on demand via /api/raw. */
+function DefinitionPanel({ leaf, onClose }: { leaf: TreemapLeaf; onClose: () => void }) {
+  const [content, setContent] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setContent(null);
+    fetch(`/api/raw?path=${encodeURIComponent(leaf.ref)}`)
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`);
+        return body.value;
+      })
+      .then((value) => {
+        if (!cancelled) {
+          setContent(typeof value === "string" ? value : JSON.stringify(value, null, 2));
+        }
+      })
+      .catch((error) => !cancelled && setContent(`failed to load: ${error}`));
+    return () => {
+      cancelled = true;
+    };
+  }, [leaf.ref]);
+
+  return (
+    <div className="mt-2 border border-ta-grey-400 bg-ta-grey-450">
+      <div className="flex items-baseline gap-3 border-b border-ta-grey-400 px-3 py-1.5">
+        <span className="type-accent-s text-ta-orange-75">{leaf.label}</span>
+        <span className="type-accent-s text-ta-grey-200">{leaf.ref}</span>
+        <Button className="ml-auto border-none" onClick={onClose}>
+          close
+        </Button>
+      </div>
+      <pre className="type-body-s max-h-72 overflow-auto whitespace-pre-wrap px-3 py-2 font-(family-name:--font-dm-mono) text-ta-grey-100">
+        {content ?? "loading..."}
+      </pre>
+    </div>
   );
 }

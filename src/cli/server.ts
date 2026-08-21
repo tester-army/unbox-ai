@@ -2,7 +2,8 @@ import { createServer, type Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { NormalizedTrace } from "../core/types";
+import { resolvePath } from "../core/path";
+import type { NormalizedTrace, RawTrace } from "../core/types";
 
 const MIME: Record<string, string> = {
   ".html": "text/html",
@@ -25,6 +26,7 @@ function viewerDir(): string {
  */
 export async function startServer(
   trace: NormalizedTrace,
+  raw: RawTrace,
   preferredPort: number,
 ): Promise<{ server: Server; port: number }> {
   const traceJson = JSON.stringify(trace);
@@ -35,6 +37,12 @@ export async function startServer(
     if (url.pathname === "/api/trace") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(traceJson);
+      return;
+    }
+    if (url.pathname === "/api/raw") {
+      const value = resolvePath(raw, url.searchParams.get("path") ?? "");
+      res.writeHead(value === undefined ? 404 : 200, { "content-type": "application/json" });
+      res.end(JSON.stringify(value === undefined ? { error: "nothing at path" } : { value }));
       return;
     }
     let requested: string;

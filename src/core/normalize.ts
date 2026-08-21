@@ -230,7 +230,7 @@ function normalizeEvent(
     carriedMessages: carried,
     foldedResults: rawNew - newMessages.length,
     newMessages,
-    breakdown: buildBreakdown(event, segment, cacheable),
+    breakdown: buildBreakdown(event, index, segment, cacheable),
   };
 }
 
@@ -350,6 +350,7 @@ function messageChars(message: RawMessage): number {
  */
 function buildBreakdown(
   event: RawEvent,
+  eventIndex: number,
   segment: number,
   cacheable: CacheableSpec,
 ): {
@@ -373,12 +374,13 @@ function buildBreakdown(
       chars,
       estTokens: 0,
       cached: index < cacheable.uptoMessage,
+      ref: `events[${eventIndex}].messages[${index}]`,
       preview: preview(message),
     };
     (role === "system" ? system : conversation).push(item);
   });
 
-  const tools: BreakdownItem[] = (event.available_tools ?? []).map((tool) => {
+  const tools: BreakdownItem[] = (event.available_tools ?? []).map((tool, toolIndex) => {
     const chars = JSON.stringify(tool).length;
     return {
       id: `tool:${tool.name}`,
@@ -386,6 +388,7 @@ function buildBreakdown(
       chars,
       estTokens: 0,
       cached: cacheable.toolsCached,
+      ref: `events[${eventIndex}].available_tools[${toolIndex}]`,
       preview: tool.description ?? "",
     };
   });

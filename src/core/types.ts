@@ -137,6 +137,8 @@ export interface BreakdownItem {
   segment?: number;
   /** True when the item is part of the repeated, cache-eligible prefix of this request. */
   cached: boolean;
+  /** Raw-trace pointer to the full definition, e.g. "events[3].available_tools[7]". */
+  ref: string;
   chars: number;
   /** Scaled so all items of a generation sum to reported input tokens. */
   estTokens: number;

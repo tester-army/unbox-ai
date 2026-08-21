@@ -38,10 +38,11 @@ type TreemapNode =
 interface TreemapProps {
   groups: TreemapGroupData[];
   onInspect: (leafId: string | null) => void;
+  onOpen: (leafId: string) => void;
 }
 
 /** Squarified treemap rendered as plain divs - square corners, borders for depth. */
-export function Treemap({ groups, onInspect }: TreemapProps) {
+export function Treemap({ groups, onInspect, onOpen }: TreemapProps) {
   const { ref, width } = useElementSize<HTMLDivElement>();
 
   const laidOut = useMemo(() => {
@@ -79,7 +80,15 @@ export function Treemap({ groups, onInspect }: TreemapProps) {
             {groupNode.children?.map((leafNode) => {
               const leafData = leafNode.data;
               if (!("leaf" in leafData)) return null;
-              return <LeafBlock key={leafData.leaf.id} node={leafNode} leaf={leafData.leaf} onInspect={onInspect} />;
+              return (
+                <LeafBlock
+                  key={leafData.leaf.id}
+                  node={leafNode}
+                  leaf={leafData.leaf}
+                  onInspect={onInspect}
+                  onOpen={onOpen}
+                />
+              );
             })}
           </GroupBlock>
         );
@@ -118,21 +127,23 @@ interface LeafBlockProps {
   node: HierarchyRectangularNode<TreemapNode>;
   leaf: TreemapLeaf;
   onInspect: (leafId: string) => void;
+  onOpen: (leafId: string) => void;
 }
 
-function LeafBlock({ node, leaf, onInspect }: LeafBlockProps) {
+function LeafBlock({ node, leaf, onInspect, onOpen }: LeafBlockProps) {
   const width = node.x1 - node.x0;
   const height = node.y1 - node.y0;
   if (width <= 0 || height <= 0) return null;
   const style = GROUP_STYLE[leaf.group];
   return (
-    <div
+    <button
       className={cn(
-        "absolute cursor-default overflow-hidden transition-colors",
+        "absolute cursor-pointer overflow-hidden text-left transition-colors",
         leaf.cached ? style.cachedBlock : style.block,
       )}
       style={{ left: node.x0, top: node.y0, width, height }}
       onMouseEnter={() => onInspect(leaf.id)}
+      onClick={() => onOpen(leaf.id)}
       title={`${leaf.label} ~${formatTokens(leaf.estTokens)} tok${
         leaf.cached === undefined ? "" : leaf.cached ? " (cached prefix)" : " (fresh)"
       }`}
@@ -152,6 +163,6 @@ function LeafBlock({ node, leaf, onInspect }: LeafBlockProps) {
           {formatTokens(leaf.estTokens)}
         </span>
       )}
-    </div>
+    </button>
   );
 }

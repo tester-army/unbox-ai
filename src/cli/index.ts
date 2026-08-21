@@ -112,7 +112,7 @@ async function view(
   loaded: ReturnType<typeof loadTrace>,
   values: { port: string; "no-open": boolean },
 ): Promise<void> {
-  const { port } = await startServer(loaded.trace, parsePort(values.port));
+  const { port } = await startServer(loaded.trace, loaded.raw, parsePort(values.port));
   const url = `http://localhost:${port}`;
   console.log(`unbox-ai: serving ${loaded.path} at ${url} (ctrl-c to stop)`);
   if (!values["no-open"]) openBrowser(url);
