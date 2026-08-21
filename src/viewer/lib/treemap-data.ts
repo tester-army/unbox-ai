@@ -17,6 +17,8 @@ export interface TreemapLeaf {
   preview: string;
   /** How many generations this item was sent in (cumulative scope). */
   sentCount: number;
+  /** Repeated cache-eligible prefix vs fresh input; undefined in cumulative scope. */
+  cached?: boolean;
 }
 
 export interface TreemapGroupData {
@@ -64,6 +66,7 @@ export function buildTreemapData(
             estTokens: item.estTokens,
             preview: item.preview,
             sentCount: 1,
+            ...(scope === "generation" ? { cached: item.cached } : {}),
           });
         }
       }

@@ -32,17 +32,21 @@ export function normalizeTrace(raw: RawTrace): NormalizedTrace {
     // verbatim, so its cache-eligible prefix is exactly that request's
     // reported input; compaction breaks the cache at the first rewrite,
     // falling back to an estimate of the still-identical leading run
+    const continues = pos.prevIndex !== null && pos.carried > 0;
     // clamp: provider token reporting is not monotonic, so the predecessor's
     // input can exceed this request's despite a byte-identical prefix
-    const cacheable: CacheableSpec =
-      pos.prevIndex !== null && pos.carried > 0 && pos.firstMutation >= pos.carried
+    const cacheable: CacheableSpec = {
+      uptoMessage: continues ? pos.firstMutation : 0,
+      toolsCached: continues,
+      ...(continues && pos.firstMutation >= pos.carried
         ? {
             exactTokens: Math.min(
-              raw.events[pos.prevIndex]!.metrics.tokens.input,
+              raw.events[pos.prevIndex!]!.metrics.tokens.input,
               event.metrics.tokens.input,
             ),
           }
-        : { uptoMessage: pos.firstMutation };
+        : {}),
+    };
     return normalizeEvent(event, index, pos, pairing, cacheable);
   });
   const segmentCount = positions.reduce((max, p) => Math.max(max, p.segment + 1), 0);
@@ -182,10 +186,14 @@ export function allToolCalls(
   );
 }
 
-/** Exact cacheable prefix tokens, or the message index the estimate runs up to. */
+/** Which part of the request is a repeated, cache-eligible prefix. */
 interface CacheableSpec {
+  /** Exact prefix tokens (the predecessor's reported input), when unmutated. */
   exactTokens?: number;
-  uptoMessage?: number;
+  /** Messages below this index are cached; compaction breaks the cache here. */
+  uptoMessage: number;
+  /** Tool definitions are part of the resent prefix on any continuation. */
+  toolsCached: boolean;
 }
 
 function normalizeEvent(
@@ -353,7 +361,6 @@ function buildBreakdown(
   const inputMessages = withoutResponse(event.messages);
   const system: BreakdownItem[] = [];
   const conversation: BreakdownItem[] = [];
-  const cacheableItems: BreakdownItem[] = [];
 
   inputMessages.forEach((message, index) => {
     const role = normalizeRole(message.role);
@@ -365,12 +372,10 @@ function buildBreakdown(
       segment,
       chars,
       estTokens: 0,
+      cached: index < cacheable.uptoMessage,
       preview: preview(message),
     };
     (role === "system" ? system : conversation).push(item);
-    if (cacheable.uptoMessage !== undefined && index < cacheable.uptoMessage) {
-      cacheableItems.push(item);
-    }
   });
 
   const tools: BreakdownItem[] = (event.available_tools ?? []).map((tool) => {
@@ -380,6 +385,7 @@ function buildBreakdown(
       label: tool.name,
       chars,
       estTokens: 0,
+      cached: cacheable.toolsCached,
       preview: tool.description ?? "",
     };
   });
@@ -391,9 +397,8 @@ function buildBreakdown(
     { key: "tools", estTokens: sumTokens(tools), items: tools },
     { key: "conversation", estTokens: sumTokens(conversation), items: conversation },
   ];
-  const cacheableTokens =
-    cacheable.exactTokens ??
-    (cacheableItems.length > 0 ? sumTokens(tools) + sumTokens(cacheableItems) : 0);
+  const cachedItems = [...system, ...tools, ...conversation].filter((item) => item.cached);
+  const cacheableTokens = cacheable.exactTokens ?? sumTokens(cachedItems);
 
   return {
     inputTokens: event.metrics.tokens.input,

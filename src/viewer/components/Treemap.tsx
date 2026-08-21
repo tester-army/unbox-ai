@@ -9,10 +9,25 @@ import { cn } from "@/lib/utils";
 const GROUP_HEADER = 20;
 const HEIGHT = 380;
 
-const GROUP_STYLE: Record<BreakdownGroupKey, { block: string; label: string }> = {
-  system: { block: "bg-ta-sand-300/25 hover:bg-ta-sand-300/40", label: "text-ta-sand-300" },
-  tools: { block: "bg-ta-orange-300/20 hover:bg-ta-orange-300/35", label: "text-ta-orange-75" },
-  conversation: { block: "bg-ta-grey-300/25 hover:bg-ta-grey-300/40", label: "text-ta-grey-100" },
+const GROUP_STYLE: Record<
+  BreakdownGroupKey,
+  { block: string; cachedBlock: string; label: string }
+> = {
+  system: {
+    block: "bg-ta-sand-300/40 hover:bg-ta-sand-300/55",
+    cachedBlock: "bg-ta-sand-300/10 hover:bg-ta-sand-300/25",
+    label: "text-ta-sand-300",
+  },
+  tools: {
+    block: "bg-ta-orange-300/35 hover:bg-ta-orange-300/50",
+    cachedBlock: "bg-ta-orange-300/8 hover:bg-ta-orange-300/20",
+    label: "text-ta-orange-75",
+  },
+  conversation: {
+    block: "bg-ta-grey-300/40 hover:bg-ta-grey-300/55",
+    cachedBlock: "bg-ta-grey-300/10 hover:bg-ta-grey-300/25",
+    label: "text-ta-grey-100",
+  },
 };
 
 type TreemapNode =
@@ -109,18 +124,26 @@ function LeafBlock({ node, leaf, onInspect }: LeafBlockProps) {
   const width = node.x1 - node.x0;
   const height = node.y1 - node.y0;
   if (width <= 0 || height <= 0) return null;
+  const style = GROUP_STYLE[leaf.group];
   return (
     <div
       className={cn(
         "absolute cursor-default overflow-hidden transition-colors",
-        GROUP_STYLE[leaf.group].block,
+        leaf.cached ? style.cachedBlock : style.block,
       )}
       style={{ left: node.x0, top: node.y0, width, height }}
       onMouseEnter={() => onInspect(leaf.id)}
-      title={`${leaf.label} ~${formatTokens(leaf.estTokens)} tok`}
+      title={`${leaf.label} ~${formatTokens(leaf.estTokens)} tok${
+        leaf.cached === undefined ? "" : leaf.cached ? " (cached prefix)" : " (fresh)"
+      }`}
     >
       {width > 56 && height > 26 && (
-        <span className="type-accent-s block truncate px-1 pt-0.5 text-ta-sand-50">
+        <span
+          className={cn(
+            "type-accent-s block truncate px-1 pt-0.5",
+            leaf.cached ? "text-ta-grey-200" : "text-ta-sand-50",
+          )}
+        >
           {leaf.label}
         </span>
       )}

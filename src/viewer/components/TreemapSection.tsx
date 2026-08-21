@@ -34,7 +34,20 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
       <div className="flex items-center gap-4 px-6 py-3">
         <h2 className="type-accent-m text-ta-sand-50">context</h2>
         <p className="type-accent-s text-ta-grey-200">
-          {scope === "generation" ? `generation ${generation.index} input · est` : "all generations · est"}
+          {scope === "generation" ? (
+            <>
+              generation {generation.index} input · est ·{" "}
+              <span className="text-ta-orange-75">
+                {formatTokens(
+                  Math.max(generation.metrics.inputTokens - generation.breakdown.cacheableTokens, 0),
+                )}{" "}
+                fresh (bright)
+              </span>{" "}
+              · {formatTokens(generation.breakdown.cacheableTokens)} cached prefix (faint)
+            </>
+          ) : (
+            "all generations · est"
+          )}
         </p>
         <div className="ml-auto flex gap-2">
           <Tabs value={scope} onValueChange={setScope}>
@@ -61,6 +74,7 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
                 ~{formatTokens(inspected.estTokens)} tok (
                 {formatPercent(inspected.estTokens, totalTokens)})
                 {inspected.sentCount > 1 ? ` sent ${inspected.sentCount}x` : ""}
+                {inspected.cached === undefined ? "" : inspected.cached ? " · cached prefix" : " · fresh"}
               </span>
               <span className="type-body-s min-w-0 truncate normal-case text-ta-grey-200">
                 {inspected.preview || "(no text)"}

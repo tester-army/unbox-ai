@@ -135,6 +135,8 @@ export interface BreakdownItem {
   role?: MessageRole;
   /** Segment the item belongs to; absent for tools, which are segment-independent. */
   segment?: number;
+  /** True when the item is part of the repeated, cache-eligible prefix of this request. */
+  cached: boolean;
   chars: number;
   /** Scaled so all items of a generation sum to reported input tokens. */
   estTokens: number;
