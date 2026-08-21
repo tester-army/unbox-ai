@@ -90,12 +90,15 @@ export function TimelineList({
     return out;
   }, [trace, starts]);
 
-  // keep the selected generation in view however it changed: playback,
-  // scrubbing, or a jump from the sidebar - smooth so scrubbing glides
-  // instead of snapping row to row
+  // keep the selected generation in view: centered while the playhead drives
+  // (playback or scrubbing) so the current event never hides at an edge;
+  // minimal movement for manual jumps
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [selectedIndex]);
+    selectedRef.current?.scrollIntoView({
+      block: replay.playing || dragging ? "center" : "nearest",
+      behavior: "smooth",
+    });
+  }, [selectedIndex, replay.playing, dragging]);
 
   const track = (fraction: number) => `calc(${LABEL_W} + (100% - ${LABEL_W}) * ${fraction})`;
 
