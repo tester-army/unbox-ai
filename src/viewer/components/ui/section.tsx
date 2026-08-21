@@ -32,8 +32,11 @@ export function Section({ title, hint, meta, actions, defaultOpen = true, childr
           {title}
         </button>
         {hint && (
-          <Hint term={hint} className="type-accent-s text-ta-grey-200">
-            what is this?
+          <Hint
+            term={hint}
+            className="type-accent-s self-center border border-ta-grey-400 px-1.5 leading-4 text-ta-grey-200 no-underline hover:border-ta-sand-300 hover:text-ta-sand-50"
+          >
+            ?
           </Hint>
         )}
         {meta && <span className="type-accent-s min-w-0 truncate text-ta-grey-200">{meta}</span>}
