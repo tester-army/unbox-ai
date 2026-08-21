@@ -43,9 +43,16 @@ that returns the rest. `--json` gives machine-readable output. When stdout is
 not a TTY, bare `unbox-ai trace.json` prints the summary instead of starting
 a server, so agents never spawn one by accident.
 
-An agent skill ships in [`skills/unbox-ai/`](skills/unbox-ai/SKILL.md) - copy
-it to your agent's skills directory (e.g. `~/.claude/skills/unbox-ai/`) to
-teach it the full workflow and analysis recipes. Or just drop this in your
+An agent skill ships in [`skills/unbox-ai/`](skills/unbox-ai/SKILL.md) with
+the full workflow and analysis recipes. Install it into your agent
+(Claude Code and friends) via the [skills](https://skills.sh) CLI:
+
+```bash
+npx skills add okwasniewski/unbox-ai -g
+```
+
+Or copy `skills/unbox-ai/` into your agent's skills directory manually
+(e.g. `~/.claude/skills/unbox-ai/`). Prefer zero setup? Drop this in your
 AGENTS.md:
 
 ```markdown
