@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { PairedToolCall } from "@core/types";
 import { formatMs } from "@core/format";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { prettyArgs, prettyPayload } from "@/lib/pretty";
 
@@ -32,15 +33,31 @@ export function CallDialog({ call, gen, onClose }: CallDialogProps) {
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
           {showRaw ? (
-            <Mono>{JSON.stringify(call, null, 2)}</Mono>
+            <div>
+              <div className="mb-2 flex items-center justify-end">
+                <CopyButton className="border-none" text={() => JSON.stringify(call, null, 2)} />
+              </div>
+              <Mono>{JSON.stringify(call, null, 2)}</Mono>
+            </div>
           ) : (
             <>
               <div>
-                <p className="type-accent-s mb-2 text-ta-grey-200">input</p>
+                <div className="mb-2 flex items-center gap-3">
+                  <p className="type-accent-s text-ta-grey-200">input</p>
+                  <CopyButton className="ml-auto border-none" text={() => prettyArgs(call.args)} />
+                </div>
                 <Mono>{prettyArgs(call.args)}</Mono>
               </div>
               <div>
-                <p className="type-accent-s mb-2 text-ta-grey-200">output</p>
+                <div className="mb-2 flex items-center gap-3">
+                  <p className="type-accent-s text-ta-grey-200">output</p>
+                  {call.result !== undefined && (
+                    <CopyButton
+                      className="ml-auto border-none"
+                      text={() => prettyPayload(call.result!)}
+                    />
+                  )}
+                </div>
                 {call.result !== undefined ? (
                   <Mono>{prettyPayload(call.result)}</Mono>
                 ) : (

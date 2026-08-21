@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Message, MessageRole } from "@core/types";
 import { formatCompact, formatTokens } from "@core/format";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { prettyArgs, prettyPayload } from "@/lib/pretty";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,11 @@ export function MessageCard({ message }: { message: Message }) {
         <span className="type-accent-s text-ta-grey-200">
           #{message.index} · ~{formatTokens(message.approxTokens)} tok
         </span>
-        <Button className="ml-auto border-none" onClick={() => setShowRaw((v) => !v)}>
+        <CopyButton
+          className="ml-auto border-none"
+          text={() => (showRaw ? JSON.stringify(message, null, 2) : message.text)}
+        />
+        <Button className="border-none" onClick={() => setShowRaw((v) => !v)}>
           {showRaw ? "pretty" : "json"}
         </Button>
       </div>
@@ -67,7 +72,10 @@ function ToolCall({ name, args, result }: { name: string; args: unknown; result?
   const short = pretty !== undefined && pretty.length <= RESULT_PREVIEW_CHARS;
   return (
     <div className="mt-2 border border-ta-grey-400 bg-ta-grey-500 px-3 py-2">
-      <p className="type-accent-s text-ta-orange-75">{name}</p>
+      <div className="flex items-center gap-2">
+        <p className="type-accent-s text-ta-orange-75">{name}</p>
+        <CopyButton className="ml-auto border-none" text={() => prettyArgs(args)} />
+      </div>
       <pre className="type-body-s overflow-x-auto whitespace-pre-wrap font-(family-name:--font-dm-mono) text-ta-grey-100">
         {prettyArgs(args)}
       </pre>
@@ -78,11 +86,14 @@ function ToolCall({ name, args, result }: { name: string; args: unknown; result?
               {pretty}
             </pre>
           )}
-          {!short && (
-            <Button className="mt-2" onClick={() => setOpen((v) => !v)}>
-              {open ? "hide result" : `show result (${formatCompact(pretty.length)} chars)`}
-            </Button>
-          )}
+          <div className="mt-2 flex gap-2">
+            {!short && (
+              <Button onClick={() => setOpen((v) => !v)}>
+                {open ? "hide result" : `show result (${formatCompact(pretty.length)} chars)`}
+              </Button>
+            )}
+            {(short || open) && <CopyButton text={pretty} />}
+          </div>
         </>
       )}
     </div>

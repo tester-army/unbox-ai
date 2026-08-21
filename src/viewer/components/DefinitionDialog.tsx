@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { contentToText } from "@core/normalize";
 import type { RawMessage, RawToolDef } from "@core/types";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Markdown } from "@/components/ui/markdown";
 import { prettyArgs, prettyPayload } from "@/lib/pretty";
@@ -32,7 +33,17 @@ export function DefinitionDialog({ leaf, onClose }: { leaf: TreemapLeaf; onClose
         <div className="flex items-center gap-4 border-b border-ta-grey-400 px-6 py-3">
           <DialogTitle>{leaf.label}</DialogTitle>
           <span className="type-accent-s text-ta-grey-200">{leaf.ref}</span>
-          <Button className="ml-auto border-none" onClick={() => setShowRaw((v) => !v)}>
+          <CopyButton
+            className="ml-auto border-none"
+            text={() =>
+              showRaw || value === undefined
+                ? JSON.stringify(value, null, 2)
+                : isTool
+                  ? JSON.stringify(value, null, 2)
+                  : prettyPayload(contentToText((value as RawMessage).content))
+            }
+          />
+          <Button className="border-none" onClick={() => setShowRaw((v) => !v)}>
             {showRaw ? "pretty" : "json"}
           </Button>
           <DialogClose render={<Button className="border-none">close</Button>} />
