@@ -53,101 +53,124 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
             no latency data in this trace
           </p>
         ) : (
-          <div className="relative h-21 w-full border border-ta-grey-400 bg-ta-grey-500">
-            {segmentRuns(trace, starts).map((run) => (
-              <span
-                key={run.key}
-                className="type-accent-s absolute top-0 flex h-5 items-center overflow-hidden border-l border-ta-grey-400 pl-1.5 whitespace-nowrap text-ta-grey-200"
-                style={{
-                  left: `${(run.start / total) * 100}%`,
-                  width: `${(run.duration / total) * 100}%`,
-                }}
-                title={`segment ${run.segment} · ${run.name}`}
-              >
-                s{run.segment} · {run.name}
-              </span>
-            ))}
-            {trace.generations.map((gen) => {
-              const { latency, timeToFirstToken } = gen.metrics;
-              const ttftShare =
-                latency > 0 && timeToFirstToken !== undefined
-                  ? Math.min(timeToFirstToken / latency, 1)
-                  : 0;
-              const { inputTokens, cacheableTokens } = gen.breakdown;
-              const cacheShare = inputTokens > 0 ? cacheableTokens / inputTokens : 0;
-              const selected = gen.index === selectedIndex;
-              return (
-                <button
-                  key={gen.index}
-                  onClick={() => onSelect(gen.index)}
-                  aria-pressed={selected}
-                  title={`[${gen.index}] ${formatSeconds(latency)}${
-                    timeToFirstToken !== undefined ? `, ttft ${formatSeconds(timeToFirstToken)}` : ""
-                  }, ${formatPercent(cacheableTokens, inputTokens)} repeated prefix`}
-                  className={cn(
-                    "absolute top-5 bottom-0 cursor-pointer overflow-hidden border-r border-ta-grey-500",
-                    selected ? "bg-ta-grey-300/60" : "bg-ta-grey-450 hover:bg-ta-grey-300/40",
-                  )}
-                  style={{
-                    left: `${((starts[gen.index] ?? 0) / total) * 100}%`,
-                    width: `${(latency / total) * 100}%`,
-                  }}
-                >
-                  <span
-                    className="absolute inset-y-0 left-0 bg-ta-grey-500/60"
-                    style={{ width: `${ttftShare * 100}%` }}
-                  />
-                  <span className="absolute inset-x-0 bottom-0 h-1.5 bg-ta-orange-300">
-                    <span
-                      className="absolute inset-y-0 left-0 bg-ta-grey-300"
-                      style={{ width: `${cacheShare * 100}%` }}
-                    />
-                  </span>
-                  <span
-                    className={cn(
-                      "type-accent-s absolute left-1 top-1",
-                      selected ? "text-ta-sand-50" : "text-ta-grey-200",
-                    )}
-                  >
-                    {gen.index}
-                  </span>
-                </button>
-              );
-            })}
-            <span
-              className="pointer-events-none absolute inset-y-0 w-0.5 bg-ta-sand-50"
-              style={{ left: `${(replay.elapsed / total) * 100}%` }}
-            />
-          </div>
+          <Lanes
+            trace={trace}
+            replay={replay}
+            selectedIndex={selectedIndex}
+            onSelect={onSelect}
+          />
         )}
       </div>
     </Section>
   );
 }
 
-interface SegmentRun {
-  key: string;
-  segment: number;
-  name: string;
-  start: number;
-  duration: number;
+const LANE_H = 26;
+const AXIS_H = 20;
+
+/**
+ * DevTools-network-style overview: one lane per agent so interleaving is
+ * visible, blocks on a shared time axis with tick gridlines.
+ */
+function Lanes({ trace, replay, selectedIndex, onSelect }: ReplayBarProps) {
+  const { total, starts } = replay;
+  const lanes = [...new Set(trace.generations.map((g) => g.name))];
+  const plotHeight = lanes.length * LANE_H;
+  const step = tickStep(total);
+  const ticks: number[] = [];
+  for (let t = step; t < total; t += step) ticks.push(t);
+
+  return (
+    <div className="flex">
+      <div className="w-32 shrink-0" style={{ paddingBottom: AXIS_H }}>
+        {lanes.map((name) => (
+          <p
+            key={name}
+            className="type-accent-s flex items-center truncate border-y border-transparent pr-3 text-right text-ta-grey-200"
+            style={{ height: LANE_H }}
+            title={name}
+          >
+            <span className="w-full truncate">{name}</span>
+          </p>
+        ))}
+      </div>
+      <div
+        className="relative min-w-0 flex-1 border border-ta-grey-400 bg-ta-grey-500"
+        style={{ height: plotHeight + AXIS_H }}
+      >
+        {ticks.map((t) => (
+          <span key={t} className="absolute top-0" style={{ left: `${(t / total) * 100}%` }}>
+            <span className="absolute w-px bg-ta-grey-450" style={{ height: plotHeight }} />
+            <span
+              className="type-accent-s absolute translate-x-1 text-ta-grey-300"
+              style={{ top: plotHeight + 2 }}
+            >
+              {formatSeconds(t)}
+            </span>
+          </span>
+        ))}
+        {trace.generations.map((gen) => {
+          const { latency, timeToFirstToken } = gen.metrics;
+          const ttftShare =
+            latency > 0 && timeToFirstToken !== undefined
+              ? Math.min(timeToFirstToken / latency, 1)
+              : 0;
+          const { inputTokens, cacheableTokens } = gen.breakdown;
+          const cacheShare = inputTokens > 0 ? cacheableTokens / inputTokens : 0;
+          const selected = gen.index === selectedIndex;
+          const lane = lanes.indexOf(gen.name);
+          return (
+            <button
+              key={gen.index}
+              onClick={() => onSelect(gen.index)}
+              aria-pressed={selected}
+              title={`[${gen.index}] ${gen.name} · ${formatSeconds(latency)}${
+                timeToFirstToken !== undefined ? `, ttft ${formatSeconds(timeToFirstToken)}` : ""
+              }, ${formatPercent(cacheableTokens, inputTokens)} repeated prefix`}
+              className={cn(
+                "absolute cursor-pointer overflow-hidden border-r border-ta-grey-500",
+                selected ? "bg-ta-grey-300/60" : "bg-ta-grey-450 hover:bg-ta-grey-300/40",
+              )}
+              style={{
+                left: `${((starts[gen.index] ?? 0) / total) * 100}%`,
+                width: `${(latency / total) * 100}%`,
+                top: lane * LANE_H + 3,
+                height: LANE_H - 6,
+              }}
+            >
+              <span
+                className="absolute inset-y-0 left-0 bg-ta-grey-500/60"
+                style={{ width: `${ttftShare * 100}%` }}
+              />
+              <span className="absolute inset-x-0 bottom-0 h-1 bg-ta-orange-300">
+                <span
+                  className="absolute inset-y-0 left-0 bg-ta-grey-300"
+                  style={{ width: `${cacheShare * 100}%` }}
+                />
+              </span>
+              <span
+                className={cn(
+                  "type-accent-s absolute left-1 top-0.5",
+                  selected ? "text-ta-sand-50" : "text-ta-grey-200",
+                )}
+              >
+                {gen.index}
+              </span>
+            </button>
+          );
+        })}
+        <span
+          className="pointer-events-none absolute top-0 w-0.5 bg-ta-sand-50"
+          style={{ left: `${(replay.elapsed / total) * 100}%`, height: plotHeight }}
+        />
+      </div>
+    </div>
+  );
 }
 
-/** Contiguous runs of generations in the same segment, on the model-time axis. */
-function segmentRuns(trace: NormalizedTrace, starts: number[]): SegmentRun[] {
-  const runs: SegmentRun[] = [];
-  trace.generations.forEach((gen, i) => {
-    const prev = trace.generations[i - 1];
-    if (!prev || prev.segment !== gen.segment) {
-      runs.push({
-        key: `${gen.segment}:${i}`,
-        segment: gen.segment,
-        name: gen.name,
-        start: starts[i] ?? 0,
-        duration: 0,
-      });
-    }
-    runs[runs.length - 1]!.duration += gen.metrics.latency;
-  });
-  return runs;
+/** A tick spacing that lands on 1/2/5/10/15/30/60-style steps, aiming for ~8 ticks. */
+function tickStep(total: number): number {
+  const candidates = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600];
+  const target = total / 8;
+  return candidates.find((c) => c >= target) ?? 3600;
 }
