@@ -32,9 +32,16 @@ export function normalizeTrace(raw: RawTrace): NormalizedTrace {
     // verbatim, so its cache-eligible prefix is exactly that request's
     // reported input; compaction breaks the cache at the first rewrite,
     // falling back to an estimate of the still-identical leading run
+    // clamp: provider token reporting is not monotonic, so the predecessor's
+    // input can exceed this request's despite a byte-identical prefix
     const cacheable: CacheableSpec =
-      pos.prevIndex !== null && pos.firstMutation >= pos.carried
-        ? { exactTokens: raw.events[pos.prevIndex]!.metrics.tokens.input }
+      pos.prevIndex !== null && pos.carried > 0 && pos.firstMutation >= pos.carried
+        ? {
+            exactTokens: Math.min(
+              raw.events[pos.prevIndex]!.metrics.tokens.input,
+              event.metrics.tokens.input,
+            ),
+          }
         : { uptoMessage: pos.firstMutation };
     return normalizeEvent(event, index, pos, pairing, cacheable);
   });
@@ -103,7 +110,9 @@ function assignSegments(events: RawEvent[]): EventPosition[] {
     let found: EventPosition | null = null;
     for (let j = i - 1; j >= 0; j--) {
       if (events[j]!.name !== event.name) continue;
-      // only the latest same-name event can be the thread tail
+      // latest compatible same-name event wins; keep scanning past
+      // incompatible tails so rollbacks and parallel same-name threads
+      // still find their true predecessor
       const firstMutation = continuationOf(events[j]!.messages, event.messages);
       if (firstMutation !== null) {
         found = {
@@ -112,8 +121,8 @@ function assignSegments(events: RawEvent[]): EventPosition[] {
           prevIndex: j,
           firstMutation,
         };
+        break;
       }
-      break;
     }
     positions.push(
       found ?? { segment: segments++, carried: 0, prevIndex: null, firstMutation: 0 },
@@ -128,7 +137,7 @@ function assignSegments(events: RawEvent[]): EventPosition[] {
  * or null when it is a different conversation.
  */
 function continuationOf(prev: RawMessage[], next: RawMessage[]): number | null {
-  if (prev.length > next.length) return null;
+  if (prev.length === 0 || prev.length > next.length) return null;
   let firstMutation = prev.length;
   for (let k = 0; k < prev.length; k++) {
     const a = prev[k]!;

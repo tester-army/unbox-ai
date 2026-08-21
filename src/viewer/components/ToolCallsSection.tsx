@@ -80,9 +80,9 @@ export function ToolCallsSection({ trace, selectedIndex, onSelect }: ToolCallsSe
                 {row.name}
               </span>
               <span role="cell" className="truncate normal-case text-ta-grey-200">
-                {JSON.stringify(row.args)}
+                {typeof row.args === "string" ? row.args : JSON.stringify(row.args)}
               </span>
-              {hasStatus && <Status success={row.success} />}
+              {hasStatus && <Status success={row.success} hasResult={row.result !== undefined} />}
               {hasDuration && (
                 <span role="cell" className="text-right text-ta-grey-100">
                   {row.durationMs !== undefined ? formatMs(row.durationMs) : "-"}
@@ -108,16 +108,22 @@ export function ToolCallsSection({ trace, selectedIndex, onSelect }: ToolCallsSe
   );
 }
 
-function Status({ success }: { success?: boolean }) {
+function Status({ success, hasResult }: { success?: boolean; hasResult: boolean }) {
   if (success === false)
     return (
       <span role="cell" className="truncate text-ta-error">
         failed
       </span>
     );
+  if (success === true)
+    return (
+      <span role="cell" className="text-ta-grey-100">
+        ok
+      </span>
+    );
   return (
-    <span role="cell" className="text-ta-grey-100">
-      {success === true ? "ok" : "-"}
+    <span role="cell" className="text-ta-grey-200">
+      {hasResult ? "done" : "-"}
     </span>
   );
 }

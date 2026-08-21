@@ -23,8 +23,8 @@ export function Waterfall({ trace, selectedIndex, onSelect }: WaterfallProps) {
         return (
           <Fragment key={gen.index}>
             {newSegment && (
-              <p className="type-accent-s border-b border-ta-grey-400 bg-ta-grey-450 px-4 py-1 text-ta-grey-200">
-                segment {gen.segment}
+              <p className="type-accent-s truncate border-b border-ta-grey-400 bg-ta-grey-450 px-4 py-1 text-ta-grey-200">
+                segment {gen.segment} · {gen.name}
               </p>
             )}
             <button
