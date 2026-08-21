@@ -43,7 +43,10 @@ that returns the rest. `--json` gives machine-readable output. When stdout is
 not a TTY, bare `unbox-ai trace.json` prints the summary instead of starting
 a server, so agents never spawn one by accident.
 
-Drop this in your AGENTS.md:
+An agent skill ships in [`skills/unbox-ai/`](skills/unbox-ai/SKILL.md) - copy
+it to your agent's skills directory (e.g. `~/.claude/skills/unbox-ai/`) to
+teach it the full workflow and analysis recipes. Or just drop this in your
+AGENTS.md:
 
 ```markdown
 To inspect AI trace files, use `npx unbox-ai` (read-only, bounded output):
