@@ -47,6 +47,7 @@ export function TimelineList({
 }: TimelineListProps) {
   const { total, starts } = replay;
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [openCall, setOpenCall] = useState<{ call: PairedToolCall; gen: number } | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -90,14 +91,27 @@ export function TimelineList({
     return out;
   }, [trace, starts]);
 
-  // keep the selected generation in view: centered while the playhead drives
-  // (playback or scrubbing) so the current event never hides at an edge;
-  // minimal movement for manual jumps
+  // keep the selected generation in view by scrolling ONLY the list (never
+  // scrollIntoView - it also scrolls the page): centered while the playhead
+  // drives, minimal movement for manual jumps
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({
-      block: replay.playing || dragging ? "center" : "nearest",
-      behavior: "smooth",
-    });
+    const list = listRef.current;
+    const row = selectedRef.current;
+    if (!list || !row) return;
+    const rowTop = row.offsetTop;
+    const rowBottom = rowTop + row.offsetHeight;
+    if (replay.playing || dragging) {
+      list.scrollTo({
+        top: rowTop - (list.clientHeight - row.offsetHeight) / 2,
+        behavior: "smooth",
+      });
+      return;
+    }
+    if (rowTop < list.scrollTop) {
+      list.scrollTo({ top: rowTop - 8, behavior: "smooth" });
+    } else if (rowBottom > list.scrollTop + list.clientHeight) {
+      list.scrollTo({ top: rowBottom - list.clientHeight + 8, behavior: "smooth" });
+    }
   }, [selectedIndex, replay.playing, dragging]);
 
   const track = (fraction: number) => `calc(${LABEL_W} + (100% - ${LABEL_W}) * ${fraction})`;
@@ -147,6 +161,7 @@ export function TimelineList({
 
   return (
     <div
+      ref={listRef}
       className="relative min-h-48 flex-1 overflow-y-auto border border-ta-grey-400 bg-ta-grey-500"
       onMouseLeave={() => setTip(null)}
     >
