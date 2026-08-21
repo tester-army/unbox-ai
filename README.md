@@ -48,7 +48,7 @@ the full workflow and analysis recipes. Install it into your agent
 (Claude Code and friends) via the [skills](https://skills.sh) CLI:
 
 ```bash
-npx skills add okwasniewski/unbox-ai -g
+npx skills add tester-army/unbox-ai -g
 ```
 
 Or copy `skills/unbox-ai/` into your agent's skills directory manually
