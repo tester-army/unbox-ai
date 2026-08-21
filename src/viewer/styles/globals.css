@@ -1,0 +1,1001 @@
+/* TesterArmy landing stylesheet. Generated — see packages/design-system. */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme inline {
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(
+        --radix-accordion-content-height,
+        var(--accordion-panel-height, auto)
+      );
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(
+        --radix-accordion-content-height,
+        var(--accordion-panel-height, auto)
+      );
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/* Custom variants */
+@custom-variant data-open {
+  &:where([data-state="open"]),
+  &:where([data-open]:not([data-open="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-closed {
+  &:where([data-state="closed"]),
+  &:where([data-closed]:not([data-closed="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-checked {
+  &:where([data-state="checked"]),
+  &:where([data-checked]:not([data-checked="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-unchecked {
+  &:where([data-state="unchecked"]),
+  &:where([data-unchecked]:not([data-unchecked="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-selected {
+  &:where([data-selected="true"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-disabled {
+  &:where([data-disabled="true"]),
+  &:where([data-disabled]:not([data-disabled="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-active {
+  &:where([data-state="active"]),
+  &:where([data-active]:not([data-active="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-horizontal {
+  &:where([data-orientation="horizontal"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-vertical {
+  &:where([data-orientation="vertical"]) {
+    @slot;
+  }
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+
+/* `.ds-light` subtrees opt out: the design-system panel is light whatever the
+ * reader's system is set to. */
+@custom-variant dark (&:is(.dark *):not(.ds-light, .ds-light *));
+
+/*
+ * Landing-page design tokens (Figma: "Bitmap version").
+ *
+ * Raw scale tokens are registered as Tailwind utilities via `@theme`
+ * (e.g. `bg-ta-orange-300`, `text-ta-sand-500`). The `.ta-landing` scope
+ * retargets the shadcn theme tokens (--background, --foreground, --primary,
+ * etc.) so primitives like <Button> pick up the landing palette automatically
+ * without leaking into the rest of the app.
+ */
+
+@theme inline {
+  /* Sand scale */
+  --color-ta-sand-50: var(--ta-sand-50);
+  --color-ta-sand-100: var(--ta-sand-100);
+  --color-ta-sand-200: var(--ta-sand-200);
+  --color-ta-sand-300: var(--ta-sand-300);
+  --color-ta-sand-400: var(--ta-sand-400);
+  --color-ta-sand-500: var(--ta-sand-500);
+
+  /* Grey scale */
+  --color-ta-grey-0: var(--ta-grey-0);
+  --color-ta-grey-50: var(--ta-grey-50);
+  --color-ta-grey-100: var(--ta-grey-100);
+  --color-ta-grey-200: var(--ta-grey-200);
+  --color-ta-grey-300: var(--ta-grey-300);
+  --color-ta-grey-400: var(--ta-grey-400);
+  --color-ta-grey-450: var(--ta-grey-450);
+  --color-ta-grey-500: var(--ta-grey-500);
+
+  /* Orange scale */
+  --color-ta-orange-50: var(--ta-orange-50);
+  --color-ta-orange-75: var(--ta-orange-75);
+  --color-ta-orange-100: var(--ta-orange-100);
+  --color-ta-orange-200: var(--ta-orange-200);
+  --color-ta-orange-300: var(--ta-orange-300);
+  --color-ta-orange-400: var(--ta-orange-400);
+
+  /* Error */
+  --color-ta-error: var(--ta-error);
+}
+
+/* `.ds-light` pins a subtree to the light theme even under `.dark` — the
+ * design-system panel documents a surface that has no dark mode. */
+:root,
+.ds-light {
+  color-scheme: light;
+  --radius: 0;
+  --theme-color-light: #ffffff;
+  --theme-color-dark: #0a0a0a;
+
+  /*
+   * Dashboard theme - mapped 1:1 from Figma "shadcn/ui (TA DS)"
+   * (file dRHkET1yCWzsmbp5FuvW9U, node 3106-14095). Orange brand primary,
+   * near-black text on white surfaces, soft-grey sidebar rail.
+   *
+   * Semantic tokens are the API; the `ta-*` scale below is the raw palette.
+   * Where a dashboard color already exists in the scale, the semantic token
+   * references the scale token. Out-of-scale literals are left as-is and
+   * listed in docs/design-tokens.md so the mapping stays explicit.
+   */
+  --background: var(--ta-grey-0);
+  --foreground: var(--ta-grey-500);
+  --card: var(--ta-grey-0);
+  --card-foreground: var(--ta-grey-500);
+  --popover: var(--ta-grey-0);
+  --popover-foreground: var(--ta-grey-500);
+  --primary: var(--ta-orange-300);
+  --primary-foreground: #111111; /* out-of-scale */
+  --secondary: #111111; /* out-of-scale */
+  --secondary-foreground: var(--ta-grey-0);
+  --muted: #dbdbdb; /* out-of-scale */
+  --muted-foreground: #393939; /* out-of-scale */
+  --accent: #f6f6f6; /* out-of-scale */
+  --accent-foreground: var(--ta-grey-500);
+  --destructive: #c5302a; /* out-of-scale, red/R300 from Figma */
+  --destructive-foreground: var(--ta-grey-0);
+  --border: var(--ta-grey-50);
+  --input: var(--ta-grey-50);
+  --ring: var(--ta-grey-500);
+  --chart-1: #cfc9bb; /* out-of-scale */
+  --chart-2: oklch(0.6 0.118 184.704); /* out-of-scale */
+  --chart-3: oklch(0.398 0.07 227.392); /* out-of-scale */
+  --chart-4: oklch(0.828 0.189 84.429); /* out-of-scale */
+  --chart-5: oklch(0.769 0.188 70.08); /* out-of-scale */
+
+  --sidebar: #f6f6f6; /* out-of-scale */
+  --sidebar-foreground: var(--ta-grey-450);
+  --sidebar-primary: var(--ta-grey-50);
+  --sidebar-primary-foreground: var(--ta-grey-500);
+  --sidebar-accent: var(--ta-grey-50);
+  --sidebar-accent-foreground: var(--ta-grey-500);
+  --sidebar-border: var(--ta-grey-50);
+  --sidebar-ring: var(--ta-grey-500);
+
+  /* Landing-page raw tokens */
+  /* Sand — warm neutrals */
+  --ta-sand-50: rgb(249 248 247);
+  --ta-sand-100: rgb(230 228 220);
+  --ta-sand-200: rgb(220 216 206);
+  --ta-sand-300: rgb(195 188 170);
+  --ta-sand-400: rgb(137 132 119);
+  --ta-sand-500: rgb(88 85 76);
+
+  /* Grey — cool neutrals */
+  --ta-grey-0: rgb(255 255 255);
+  --ta-grey-50: rgb(232 232 232);
+  --ta-grey-100: rgb(206 206 206);
+  --ta-grey-200: rgb(159 159 159);
+  --ta-grey-300: rgb(120 120 120);
+  --ta-grey-400: rgb(78 78 78);
+  /* NOTE: ta-grey-450 (#1e1e1e) maps to Figma's "G500", and ta-grey-500 (#161616)
+     maps to Figma's "G600". The ramp is off-by-one vs the design tokens — kept
+     this way to avoid renaming `ta-grey-500` across the codebase. */
+  --ta-grey-450: rgb(30 30 30);
+  --ta-grey-500: rgb(22 22 22);
+
+  /* Orange — brand */
+  --ta-orange-50: rgb(255 242 230);
+  --ta-orange-75: rgb(255 203 151);
+  --ta-orange-100: rgb(255 181 108);
+  --ta-orange-200: rgb(255 150 44);
+  --ta-orange-300: rgb(255 128 1);
+  --ta-orange-400: rgb(156 78 1);
+
+  /* Error — soft red for form validation on dark surfaces */
+  --ta-error: rgb(231 170 168);
+}
+
+/*
+ * Scoped shadcn theme — apply to the landing-page root to retarget
+ * shadcn primitives onto the landing palette without touching the
+ * global dashboard theme. The landing page is dark-first; a single
+ * "light panel" section flips to the Sand palette via `.ta-surface-light`.
+ */
+html:has(.ta-landing),
+body.bg-background:has(.ta-landing) {
+  background-color: var(--ta-grey-500);
+}
+
+.ta-landing {
+  background-color: var(--ta-grey-500);
+  color: var(--ta-sand-50);
+  font-family:
+    var(--font-inter),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+
+  --background: var(--ta-grey-500);
+  --foreground: var(--ta-sand-50);
+
+  --card: var(--ta-grey-400);
+  --card-foreground: var(--ta-sand-50);
+
+  --popover: var(--ta-grey-400);
+  --popover-foreground: var(--ta-sand-50);
+
+  --primary: var(--ta-orange-300);
+  --primary-foreground: var(--ta-grey-0);
+
+  --secondary: var(--ta-grey-400);
+  --secondary-foreground: var(--ta-sand-50);
+
+  --muted: var(--ta-grey-400);
+  --muted-foreground: var(--ta-grey-100);
+
+  --accent: var(--ta-orange-300);
+  --accent-foreground: var(--ta-grey-500);
+
+  --border: var(--ta-grey-400);
+  --input: var(--ta-grey-400);
+  --ring: var(--ta-orange-300);
+}
+
+/*
+ * Cookie consent banner (c15t) on landing pages.
+ *
+ * The banner renders outside the `.ta-landing` scope, so it would otherwise
+ * pick up the light dashboard theme on top of the dark landing page. Retarget
+ * the `--c15t-*` tokens (set on `:root`/`:root.dark` by the c15t theme
+ * provider in components/analytics/consent-manager.tsx) onto the landing
+ * palette. `html:has(...)` / `html.dark:has(...)` out-rank those blocks.
+ */
+html:has(.ta-landing),
+html.dark:has(.ta-landing) {
+  --c15t-primary: var(--ta-orange-300);
+  --c15t-primary-hover: var(--ta-orange-200);
+  --c15t-text-on-primary: var(--ta-grey-0);
+  --c15t-surface: var(--ta-grey-450);
+  --c15t-surface-hover: var(--ta-grey-500);
+  --c15t-border: var(--ta-grey-400);
+  --c15t-border-hover: var(--ta-grey-300);
+  --c15t-text: var(--ta-sand-50);
+  --c15t-text-muted: var(--ta-grey-100);
+  --c15t-switch-track: var(--ta-grey-400);
+  --c15t-switch-track-active: var(--ta-orange-300);
+  --c15t-switch-thumb: var(--ta-grey-0);
+  --c15t-font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Light panel — used by the "How it works" + logo grid section */
+.ta-landing .ta-surface-light {
+  background-color: var(--ta-sand-50);
+  color: var(--ta-grey-500);
+
+  --background: var(--ta-sand-50);
+  --foreground: var(--ta-grey-500);
+
+  --card: var(--ta-grey-0);
+  --card-foreground: var(--ta-grey-500);
+
+  --popover: var(--ta-grey-0);
+  --popover-foreground: var(--ta-grey-500);
+
+  --secondary: var(--ta-sand-100);
+  --secondary-foreground: var(--ta-grey-500);
+
+  --muted: var(--ta-sand-100);
+  --muted-foreground: var(--ta-sand-500);
+
+  --border: var(--ta-sand-200);
+  --input: var(--ta-sand-200);
+}
+
+.dark {
+  /*
+   * Dark mode - mapped 1:1 from the Figma dark frame (node 3114-15660,
+   * shadcn-ui [TA DS] "mode" collection). Sidebar #111111 is the darkest
+   * surface (canvas); background/card #1e1e1e sit above it; #393939 for
+   * borders/muted; accent #161616 (= gray/G25) for subtle badge/hover fills.
+   *
+   * Out-of-scale values are documented in docs/design-tokens.md.
+   */
+  --background: var(--ta-grey-450);
+  --foreground: #f6f6f6; /* out-of-scale */
+  --card: var(--ta-grey-450);
+  --card-foreground: #f6f6f6; /* out-of-scale */
+  --popover: var(--ta-grey-450);
+  --popover-foreground: #f6f6f6; /* out-of-scale */
+  --primary: var(--ta-orange-300);
+  --primary-foreground: #111111; /* out-of-scale */
+  --secondary: #f6f6f6; /* out-of-scale */
+  --secondary-foreground: var(--ta-grey-450);
+  --muted: #393939; /* out-of-scale */
+  --muted-foreground: var(--ta-grey-100);
+  --accent: var(--ta-grey-500);
+  --accent-foreground: #f6f6f6; /* out-of-scale */
+  --destructive: #c5302a; /* out-of-scale, red/R300 from Figma */
+  --destructive-foreground: var(--ta-grey-0);
+  --border: #393939; /* out-of-scale */
+  --input: #393939; /* out-of-scale */
+  --ring: var(--ta-grey-300);
+  --chart-1: #524f47; /* out-of-scale */
+  --chart-2: oklch(0.696 0.17 162.48); /* out-of-scale */
+  --chart-3: oklch(0.769 0.188 70.08); /* out-of-scale */
+  --chart-4: oklch(0.627 0.265 303.9); /* out-of-scale */
+  --chart-5: oklch(0.645 0.246 16.439); /* out-of-scale */
+
+  --sidebar: #111111; /* out-of-scale */
+  --sidebar-foreground: #f6f6f6; /* out-of-scale */
+  --sidebar-primary: var(--ta-grey-450);
+  --sidebar-primary-foreground: #f6f6f6; /* out-of-scale */
+  --sidebar-accent: var(--ta-grey-450);
+  --sidebar-accent-foreground: #f6f6f6; /* out-of-scale */
+  --sidebar-border: #393939; /* out-of-scale */
+  --sidebar-ring: var(--ta-grey-300);
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+  --font-heading: var(--font-sans);
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@keyframes marching-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.marching-border {
+  position: relative;
+  border: none !important;
+}
+
+.marching-border > .marching-border-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.marching-border > .marching-border-svg rect {
+  animation: marching-dash 800ms linear infinite;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  html {
+    @apply overflow-x-hidden bg-background font-sans;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply has-[div[data-variant='inset']]:bg-sidebar min-h-svh w-full bg-background text-foreground;
+  }
+
+  body[data-scroll-locked] {
+    overflow: unset !important;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  @media screen and (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+}
+
+@utility container {
+  margin-inline: auto;
+  width: 100%;
+  padding-inline: 1rem;
+}
+
+@utility ui-container {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 64rem;
+  padding-inline: 1rem;
+}
+
+@utility ui-container-wide {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 72rem;
+  padding-inline: 1rem;
+}
+
+@utility ui-container-prose {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 56rem;
+  padding-inline: 1rem;
+}
+
+@utility ui-container-narrow {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 48rem;
+  padding-inline: 1rem;
+}
+
+@utility ui-landing-container {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1512px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding-inline: 1.25rem;
+}
+
+@utility ui-page-header {
+  padding-top: 6rem;
+  padding-bottom: 2.5rem;
+}
+
+@utility ui-page-section {
+  padding-block: 4rem;
+}
+
+@utility ui-marketing-section {
+  padding-block: 5rem;
+}
+
+@media (min-width: 640px) {
+  .container,
+  .ui-container,
+  .ui-container-wide,
+  .ui-container-prose,
+  .ui-container-narrow {
+    padding-inline: 1.5rem;
+  }
+
+  .ui-page-header {
+    padding-bottom: 3rem;
+  }
+
+  .ui-landing-container {
+    padding-inline: 2rem;
+  }
+
+  .ui-page-section {
+    padding-block: 4.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .ui-landing-container {
+    padding-inline: 3.5rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .ui-landing-container {
+    padding-inline: 7rem;
+  }
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/*
+ * Landing typography scale — authoritative values from the Figma
+ * "Bitmap version" text styles.
+ */
+
+@utility type-h1 {
+  font-family: var(--font-stack-sans-notch), ui-sans-serif, system-ui, sans-serif;
+  font-size: 40px;
+  line-height: 46px;
+  font-weight: 500;
+  letter-spacing: 0;
+
+  @media (min-width: 640px) {
+    font-size: 48px;
+    line-height: 56px;
+  }
+  @media (min-width: 1024px) {
+    font-size: 60px;
+    line-height: 68px;
+  }
+}
+
+@utility type-h2 {
+  font-family: var(--font-stack-sans-notch), ui-sans-serif, system-ui, sans-serif;
+  font-size: 32px;
+  line-height: 38px;
+  font-weight: 400;
+  letter-spacing: 0;
+
+  @media (min-width: 640px) {
+    font-size: 38px;
+    line-height: 46px;
+  }
+  @media (min-width: 1024px) {
+    font-size: 44px;
+    line-height: 52px;
+  }
+}
+
+@utility type-accent-m {
+  font-family: var(--font-dm-mono), ui-monospace, monospace;
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@utility type-accent-s {
+  font-family: var(--font-dm-mono), ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 14px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@utility type-body-l {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 400;
+
+  @media (min-width: 1024px) {
+    font-size: 20px;
+    line-height: 28px;
+  }
+}
+
+@utility type-body-m {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+@utility type-body-s {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+@utility type-button {
+  font-family: var(--font-dm-mono), ui-monospace, monospace;
+  font-size: 14px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+@utility ta-landing-container {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1512px;
+  padding-inline: 1rem;
+  border-inline: 1px solid var(--ta-grey-400);
+
+  @media (min-width: 640px) {
+    padding-inline: 2rem;
+  }
+  @media (min-width: 1024px) {
+    padding-inline: 3.5rem;
+  }
+  @media (min-width: 1280px) {
+    padding-inline: 7rem;
+  }
+}
+
+@utility ta-landing-frame {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1512px;
+  border-inline: 1px solid var(--ta-grey-400);
+}
+
+@utility ta-landing-gutter {
+  padding-inline: 1rem;
+
+  @media (min-width: 640px) {
+    padding-inline: 2rem;
+  }
+  @media (min-width: 1024px) {
+    padding-inline: 3.5rem;
+  }
+  @media (min-width: 1280px) {
+    padding-inline: 7rem;
+  }
+}
+
+.ta-surface-light .ta-landing-container,
+.ta-surface-light .ta-landing-frame {
+  border-color: var(--ta-sand-200);
+}
+
+@keyframes ta-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@utility animate-ta-marquee {
+  animation: ta-marquee 40s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ta-marquee {
+    animation: none;
+  }
+}
+
+@keyframes ta-grid-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -24px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@utility animate-ta-grid-reveal {
+  animation: ta-grid-reveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ta-grid-reveal {
+    animation: none;
+  }
+}
+
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+@keyframes border-beam {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+.border-beam {
+  animation: border-beam 8s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 4px currentColor;
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 8px currentColor;
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes suggestion-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px var(--color-primary),
+      0 0 10px -3px var(--color-primary);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--color-primary),
+      0 0 16px 0 var(--color-primary);
+  }
+}
+
+/* Accent stroke + breathing glow marking the one suggestion chip we want
+   clicked next; static ring only when motion is reduced. */
+@utility suggestion-glow {
+  box-shadow:
+    0 0 0 1px var(--color-primary),
+    0 0 10px -3px var(--color-primary);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: suggestion-glow 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.draw-line {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: draw-line 2s ease-out forwards;
+}
+
+@utility marketing-glow {
+  box-shadow: 0 0 80px -20px rgba(249, 115, 22, 0.3);
+}
+
+@utility marketing-grid {
+  background-image:
+    linear-gradient(rgba(249, 115, 22, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(249, 115, 22, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+@utility marketing-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+[data-sonner-toast][data-styled="true"]:has([data-button]) {
+  flex-wrap: wrap;
+}
+
+[data-sonner-toast][data-styled="true"] [data-button] {
+  margin-left: 0 !important;
+  margin-top: 4px;
+}
+
+/* React Flow theme integration */
+.react-flow {
+  --xy-background-color-default: var(--background);
+  --xy-edge-stroke-default: var(--border);
+  --xy-controls-button-background-color-default: var(--card);
+  --xy-controls-button-border-color-default: var(--border);
+  --xy-controls-button-color-default: var(--foreground);
+}
+
+.dark .react-flow {
+  --xy-background-color-default: var(--background);
+  --xy-background-pattern-color-default: oklch(0.3 0.02 260);
+  --xy-edge-stroke-default: var(--border);
+  --xy-controls-button-background-color-default: var(--card);
+  --xy-controls-button-border-color-default: var(--border);
+  --xy-controls-button-color-default: var(--foreground);
+}
+
+.CollapsibleContent {
+  overflow: hidden;
+}
+.CollapsibleContent[data-state="open"] {
+  animation: slideDown 300ms ease-out;
+}
+.CollapsibleContent[data-state="closed"] {
+  animation: slideUp 300ms ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+/*
+ * When the user enters native fullscreen, force object-contain and
+ * viewport-bounded sizing regardless of how the replay video is laid out
+ * inline, otherwise portrait mobile recordings get cropped or overflow the
+ * landscape viewport (WebKit's native video fullscreen path in particular
+ * ignores the inline layout classes).
+ */
+.replay-video:fullscreen,
+.replay-video:-webkit-full-screen,
+.replay-video.replay-video-fullscreen {
+  object-fit: contain !important;
+  background: black;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw;
+  max-height: 100vh;
+}
+
+.replay-video::backdrop {
+  background: black;
+}
+
+/*
+ * Limrun's live mobile simulator uses its own video element, so scope the
+ * same control hiding to that embedded preview as well.
+ */
+.mobile-simulator-live-preview video::-webkit-media-controls-fullscreen-button,
+.mobile-simulator-live-preview video::-webkit-media-controls-picture-in-picture-button,
+.mobile-simulator-live-preview video::-webkit-media-controls-overflow-button,
+.mobile-simulator-live-preview .rc-video::-webkit-media-controls-fullscreen-button,
+.mobile-simulator-live-preview .rc-video::-webkit-media-controls-picture-in-picture-button,
+.mobile-simulator-live-preview .rc-video::-webkit-media-controls-overflow-button {
+  display: none !important;
+}
+
+@source "../components";
+@source "../reference";
+@source "../example";

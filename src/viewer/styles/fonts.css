@@ -1,0 +1,33 @@
+/*
+ * Landing typefaces, vendored from the TesterArmy design system.
+ * Stack Sans Notch is not OFL so it does not ship in this OSS package;
+ * headings fall back to Inter.
+ */
+@font-face {
+  font-family: "Inter Variable";
+  src: url("/fonts/inter-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Mono";
+  src: url("/fonts/dm-mono-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Mono";
+  src: url("/fonts/dm-mono-latin-500-normal.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+:root {
+  --font-stack-sans-notch: "Inter Variable";
+  --font-inter: "Inter Variable";
+  --font-dm-mono: "DM Mono";
+  --font-geist-sans: "Inter Variable";
+  --font-geist-mono: "DM Mono";
+}

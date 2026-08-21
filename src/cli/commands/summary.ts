@@ -1,0 +1,40 @@
+import type { LoadedTrace } from "../load";
+import { formatCost, formatSeconds, formatTokens, printJson } from "../output";
+
+/** Prints trace totals plus a one-liner per generation. */
+export function summary(loaded: LoadedTrace, json: boolean): void {
+  const { trace } = loaded;
+  if (json) {
+    printJson({
+      traceId: trace.traceId,
+      name: trace.name,
+      timestamp: trace.timestamp,
+      models: trace.models,
+      generations: trace.generations.length,
+      segments: trace.segmentCount,
+      totalTokens: trace.totalTokens,
+      totalCost: trace.totalCost,
+      totalLatency: trace.totalLatency,
+    });
+    return;
+  }
+  console.log(`${trace.name}  (trace ${trace.traceId})`);
+  console.log(`started   ${trace.timestamp}`);
+  console.log(`models    ${trace.models.join(", ")}`);
+  console.log(
+    `totals    ${trace.generations.length} generations in ${trace.segmentCount} segments, ` +
+      `${formatTokens(trace.totalTokens.input)} in / ${formatTokens(trace.totalTokens.output)} out, ` +
+      `${formatCost(trace.totalCost)}, ${formatSeconds(trace.totalLatency)} model time`,
+  );
+  console.log("");
+  for (const gen of trace.generations) {
+    const last = gen.newMessages.at(-1);
+    const calls = last?.toolCalls?.map((c) => c.name).join(", ");
+    const doing = calls ? `-> ${calls}` : last ? `-> ${last.text.slice(0, 60)}` : "";
+    console.log(
+      `  [${gen.index}] seg ${gen.segment}  ${formatTokens(gen.metrics.inputTokens)} in  ` +
+        `${formatSeconds(gen.metrics.latency)}  ${formatCost(gen.metrics.cost)}  ${doing}`,
+    );
+  }
+  console.log("\nnext: unbox-ai events <trace> | unbox-ai event <trace> <idx>");
+}

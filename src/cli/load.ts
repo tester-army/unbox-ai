@@ -1,0 +1,35 @@
+import { readFileSync } from "node:fs";
+import { normalizeTrace } from "../core/normalize";
+import type { NormalizedTrace, RawTrace } from "../core/types";
+
+export interface LoadedTrace {
+  path: string;
+  raw: RawTrace;
+  trace: NormalizedTrace;
+}
+
+/** Reads, parses, and normalizes a trace file, exiting with a readable error on failure. */
+export function loadTrace(path: string): LoadedTrace {
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    fail(`Cannot read file: ${path}`);
+  }
+  let raw: RawTrace;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    fail(`Not valid JSON: ${path}`);
+  }
+  try {
+    return { path, raw, trace: normalizeTrace(raw) };
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+}
+
+export function fail(message: string): never {
+  console.error(`unbox-ai: ${message}`);
+  process.exit(1);
+}
