@@ -2,21 +2,25 @@ import type { Generation } from "@core/types";
 import { formatCost, formatPercent, formatSeconds, formatTokens } from "@core/format";
 import { MessageCard } from "@/components/MessageCard";
 import { Hint } from "@/components/ui/hint";
+import { Section } from "@/components/ui/section";
 
 /** The selected generation: metrics line plus its new-vs-previous messages. */
 export function GenerationDetail({ generation }: { generation: Generation }) {
   const m = generation.metrics;
   return (
-    <section className="flex flex-col gap-3 px-6 py-4">
-      <div className="flex items-baseline gap-4">
-        <h2 className="type-accent-m text-ta-sand-50">generation {generation.index}</h2>
-        <span className="type-accent-s text-ta-grey-200">
+    <Section
+      title={`generation ${generation.index}`}
+      hint="generation"
+      meta={
+        <>
           {generation.model} · {formatTokens(m.inputTokens)} in / {formatTokens(m.outputTokens)}{" "}
           out · {formatSeconds(m.latency)}
           {m.timeToFirstToken !== undefined && ` (ttft ${formatSeconds(m.timeToFirstToken)})`} ·{" "}
           {formatCost(m.cost)} · {generation.toolCount} tools
-        </span>
-      </div>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3 px-6 pb-4">
       <p className="type-accent-s text-ta-grey-200">
         {generation.carriedMessages > 0
           ? `${generation.carriedMessages} carried messages, showing the ${generation.newMessages.length} new`
@@ -41,6 +45,7 @@ export function GenerationDetail({ generation }: { generation: Generation }) {
           <MessageCard key={message.index} message={message} />
         ))}
       </div>
-    </section>
+      </div>
+    </Section>
   );
 }

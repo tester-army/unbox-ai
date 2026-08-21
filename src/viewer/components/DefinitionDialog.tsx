@@ -29,7 +29,7 @@ export function DefinitionDialog({ leaf, onClose }: { leaf: TreemapLeaf; onClose
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <div className="flex items-baseline gap-4 border-b border-ta-grey-400 px-6 py-4">
+        <div className="flex items-center gap-4 border-b border-ta-grey-400 px-6 py-3">
           <DialogTitle>{leaf.label}</DialogTitle>
           <span className="type-accent-s text-ta-grey-200">{leaf.ref}</span>
           <Button className="ml-auto border-none" onClick={() => setShowRaw((v) => !v)}>

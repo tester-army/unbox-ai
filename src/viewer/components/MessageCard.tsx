@@ -24,7 +24,7 @@ export function MessageCard({ message }: { message: Message }) {
 
   return (
     <article className="border border-ta-grey-400 bg-ta-grey-450">
-      <div className="flex items-baseline gap-3 border-b border-ta-grey-400 px-3 py-1.5">
+      <div className="flex items-center gap-3 border-b border-ta-grey-400 px-3 py-1">
         <span className={cn("type-accent-s", ROLE_STYLE[message.role])}>{message.role}</span>
         <span className="type-accent-s text-ta-grey-200">
           #{message.index} · ~{formatTokens(message.approxTokens)} tok

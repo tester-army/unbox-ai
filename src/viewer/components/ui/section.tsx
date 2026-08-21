@@ -20,25 +20,24 @@ export function Section({ title, hint, meta, actions, defaultOpen = true, childr
   const [open, setOpen] = useState(defaultOpen);
   return (
     <section className="border-b border-ta-grey-400">
-      <div className="flex items-baseline gap-4 px-6 py-3">
+      <div className="flex min-h-13 items-center gap-4 px-6 py-2">
         <button
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="type-accent-m flex cursor-pointer items-baseline gap-2 text-ta-sand-50"
+          className="type-accent-m flex cursor-pointer items-center gap-2 text-ta-sand-50"
         >
           <span className={cn("text-ta-grey-200 transition-transform", !open && "-rotate-90")}>
             ▾
           </span>
-          {title}
+          {hint ? (
+            // the title itself explains the section on hover
+            <Hint term={hint} className="cursor-pointer no-underline">
+              {title}
+            </Hint>
+          ) : (
+            title
+          )}
         </button>
-        {hint && (
-          <Hint
-            term={hint}
-            className="type-accent-s self-center border border-ta-grey-400 px-1.5 leading-4 text-ta-grey-200 no-underline hover:border-ta-sand-300 hover:text-ta-sand-50"
-          >
-            ?
-          </Hint>
-        )}
         {meta && <span className="type-accent-s min-w-0 truncate text-ta-grey-200">{meta}</span>}
         {actions && <div className="ml-auto flex shrink-0 items-center gap-2">{actions}</div>}
       </div>

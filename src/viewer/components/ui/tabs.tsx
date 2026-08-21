@@ -30,7 +30,8 @@ function TabsTrigger({ className, ...props }: ComponentProps<typeof BaseTabs.Tab
   return (
     <BaseTabs.Tab
       className={cn(
-        "type-accent-s cursor-pointer px-3 py-1.5 text-ta-grey-200 transition-colors",
+        // h-7 minus the list's 1px borders keeps tab groups exactly as tall as buttons
+        "type-accent-s inline-flex h-[calc(--spacing(7)-2px)] cursor-pointer items-center px-3 text-ta-grey-200 transition-colors",
         "hover:text-ta-sand-50 data-[selected]:bg-ta-sand-50 data-[selected]:text-ta-grey-500",
         className,
       )}
