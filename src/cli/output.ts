@@ -30,6 +30,13 @@ export function truncate(
   return `${text.slice(0, max)}\n[... ${rest} more chars${hint}]`;
 }
 
+/** Collapses repeated tool names: [a,a,a,b] -> "a x3, b". */
+export function formatCallNames(names: string[]): string {
+  const counts = new Map<string, number>();
+  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  return [...counts.entries()].map(([name, n]) => (n > 1 ? `${name} x${n}` : name)).join(", ");
+}
+
 /** Renders rows as a padded plain-text table. */
 export function table(headers: string[], rows: string[][]): string {
   const all = [headers, ...rows];

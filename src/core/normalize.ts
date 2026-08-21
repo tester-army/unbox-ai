@@ -132,6 +132,10 @@ function continuationOf(prev: RawMessage[], next: RawMessage[]): number | null {
     const a = prev[k]!;
     const b = next[k]!;
     if (deepEqual(a, b)) continue;
+    // snapshots can catch the newest tool call mid-stream with empty args
+    // that the next snapshot completes - the request the provider actually
+    // saw had the full args, so this is equality, not a mutation
+    if (argsFilledIn(a, b)) continue;
     const structurallySame =
       a.role === b.role &&
       a.tool_call_id === b.tool_call_id &&
@@ -143,6 +147,25 @@ function continuationOf(prev: RawMessage[], next: RawMessage[]): number | null {
     return null;
   }
   return firstMutation;
+}
+
+/** True when b is a with previously-empty tool call arguments filled in. */
+function argsFilledIn(a: RawMessage, b: RawMessage): boolean {
+  if (a.role !== b.role || a.tool_call_id !== b.tool_call_id) return false;
+  if (!deepEqual(a.content, b.content)) return false;
+  const callsA = a.tool_calls ?? [];
+  const callsB = b.tool_calls ?? [];
+  if (callsA.length !== callsB.length) return false;
+  return callsA.every((call, i) => {
+    const other = callsB[i]!;
+    if (call.id !== other.id || call.function.name !== other.function.name) return false;
+    return deepEqual(call.function.arguments, other.function.arguments) || isEmptyArgs(call.function.arguments);
+  });
+}
+
+function isEmptyArgs(args: unknown): boolean {
+  if (args == null) return true;
+  return typeof args === "object" && Object.keys(args).length === 0;
 }
 
 /** True for messages the runtime replaced with a "[compacted] ..." summary. */

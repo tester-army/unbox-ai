@@ -1,7 +1,7 @@
 import { formatPercent } from "../../core/format";
 import { toolCallNames } from "../../core/normalize";
 import type { LoadedTrace } from "../load";
-import { formatCost, formatSeconds, formatTokens, printJson } from "../output";
+import { formatCallNames, formatCost, formatSeconds, formatTokens, printJson } from "../output";
 
 function cacheableSum(loaded: LoadedTrace): number {
   return loaded.trace.generations.reduce((acc, g) => acc + g.breakdown.cacheableTokens, 0);
@@ -41,7 +41,7 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
   );
   console.log("");
   for (const gen of trace.generations) {
-    const calls = toolCallNames(gen).join(", ");
+    const calls = formatCallNames(toolCallNames(gen));
     const last = gen.newMessages.at(-1);
     const doing = calls ? `-> ${calls}` : last ? `-> ${last.text.slice(0, 60)}` : "";
     console.log(
