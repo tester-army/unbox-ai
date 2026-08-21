@@ -102,6 +102,30 @@ export function TimelineList({
     onScrub(fraction * total);
   };
 
+  // click vs drag on the track: a stationary click over a tool row opens it,
+  // elsewhere it seeks; dragging scrubs (scrub must not start on pointerdown,
+  // or the auto-scroll moves the row before a click's hit-test runs)
+  const downAt = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  const callsByKey = useMemo(() => {
+    const map = new Map<string, { call: PairedToolCall; gen: number }>();
+    for (const row of rows) {
+      if (row.kind === "tool") map.set(row.key, { call: row.call, gen: row.gen });
+    }
+    return map;
+  }, [rows]);
+
+  /** Opens the tool row under the pointer; returns false when none is there. */
+  const openToolUnderPointer = (e: React.PointerEvent<HTMLDivElement>): boolean => {
+    const overlay = e.currentTarget;
+    overlay.style.pointerEvents = "none";
+    const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-tool-key]");
+    overlay.style.pointerEvents = "";
+    const key = hit?.getAttribute("data-tool-key");
+    const entry = key ? callsByKey.get(key) : undefined;
+    if (entry) setOpenCall(entry);
+    return entry !== undefined;
+  };
+
   return (
     <div
       className="relative min-h-48 flex-1 overflow-y-auto border border-ta-grey-400 bg-ta-grey-500"
@@ -113,11 +137,29 @@ export function TimelineList({
           className="absolute inset-y-0 right-0 z-10 cursor-ew-resize"
           style={{ left: LABEL_W }}
           onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            scrubFromEvent(e);
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+              // synthetic or already-released pointers cannot be captured
+            }
+            downAt.current = { x: e.clientX, y: e.clientY, moved: false };
           }}
           onPointerMove={(e) => {
-            if (e.buttons === 1) scrubFromEvent(e);
+            const down = downAt.current;
+            if (!down || e.buttons !== 1) return;
+            if (!down.moved && Math.abs(e.clientX - down.x) < 4 && Math.abs(e.clientY - down.y) < 4) {
+              return;
+            }
+            down.moved = true;
+            scrubFromEvent(e);
+          }}
+          onPointerUp={(e) => {
+            const down = downAt.current;
+            downAt.current = null;
+            if (!down) return;
+            if (down.moved) return;
+            // a click: open the tool under the pointer, else seek there
+            if (!openToolUnderPointer(e)) scrubFromEvent(e);
           }}
         />
         {ticks.map((t) => (
@@ -160,6 +202,7 @@ export function TimelineList({
             <button
               key={row.key}
               ref={!isTool && selected ? selectedRef : undefined}
+              data-tool-key={isTool ? row.key : undefined}
               onClick={() => {
                 onSelect(row.gen);
                 if (isTool) setOpenCall({ call: row.call, gen: row.gen });

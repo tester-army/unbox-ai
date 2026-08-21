@@ -133,7 +133,11 @@ function PlayerControls({ replay, onScrub, playerRef, fullscreen }: PlayerContro
         ref={trackRef}
         className="relative h-7 min-w-0 flex-1 cursor-ew-resize border border-ta-grey-400 bg-ta-grey-450"
         onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            // synthetic or already-released pointers cannot be captured
+          }
           scrubFromEvent(e);
         }}
         onPointerMove={(e) => {
