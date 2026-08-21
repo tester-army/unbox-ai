@@ -3,6 +3,7 @@ import type { NormalizedTrace } from "@core/types";
 import { GenerationDetail } from "@/components/GenerationDetail";
 import { Header } from "@/components/Header";
 import { ReplayBar } from "@/components/ReplayBar";
+import { ToolCallsSection } from "@/components/ToolCallsSection";
 import { TreemapSection } from "@/components/TreemapSection";
 import { Waterfall } from "@/components/Waterfall";
 import { useReplay } from "@/lib/use-replay";
@@ -64,7 +65,7 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
     <Shell>
       <Header trace={trace} />
       <div className="flex min-h-0 flex-1">
-        <aside className="w-100 shrink-0 overflow-y-auto border-r border-ta-grey-400">
+        <aside className="w-80 shrink-0 overflow-y-auto border-r border-ta-grey-400">
           <Waterfall
             trace={trace}
             selectedIndex={selected.index}
@@ -79,6 +80,11 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
             onSelect={selectGeneration}
           />
           <TreemapSection trace={trace} generation={selected} />
+          <ToolCallsSection
+            trace={trace}
+            selectedIndex={selected.index}
+            onSelect={selectGeneration}
+          />
           <GenerationDetail key={selected.index} generation={selected} />
         </main>
       </div>

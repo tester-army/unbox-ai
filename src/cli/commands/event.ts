@@ -1,3 +1,4 @@
+import { formatMs } from "../../core/format";
 import type { Message } from "../../core/types";
 import { fail, type LoadedTrace } from "../load";
 import {
@@ -58,7 +59,14 @@ function printMessage(message: Message, genIndex: number): void {
       const pointer = call.resultRef
         ? contentPointer(call.resultRef.event, call.resultRef.message)
         : undefined;
-      console.log(`  result: ${truncate(call.result, pointer, TOOL_FIELD_CHARS)}`);
+      const meta = [
+        call.durationMs !== undefined ? formatMs(call.durationMs) : undefined,
+        call.success === false ? "FAILED" : undefined,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      const label = meta ? `result (${meta})` : "result";
+      console.log(`  ${label}: ${truncate(call.result, pointer, TOOL_FIELD_CHARS)}`);
     }
   });
   console.log("");

@@ -34,9 +34,7 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
       <div className="flex items-center gap-4 px-6 py-3">
         <h2 className="type-accent-m text-ta-sand-50">context</h2>
         <p className="type-accent-s text-ta-grey-200">
-          {scope === "generation"
-            ? `input of generation ${generation.index}, est per block`
-            : "all generations summed, est per block"}
+          {scope === "generation" ? `generation ${generation.index} input · est` : "all generations · est"}
         </p>
         <div className="ml-auto flex gap-2">
           <Tabs value={scope} onValueChange={setScope}>

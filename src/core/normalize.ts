@@ -188,7 +188,7 @@ function normalizeMessage(
       id: call.id,
       name: call.function.name,
       args: call.function.arguments,
-      ...(result ? { result: result.text, resultRef: result.ref } : {}),
+      ...(result ? { result: result.text, resultRef: result.ref, ...resultMeta(result.text) } : {}),
     };
   });
   return {
@@ -198,6 +198,19 @@ function normalizeMessage(
     ...(toolCalls?.length ? { toolCalls } : {}),
     approxTokens: Math.round(messageChars(raw) / CHARS_PER_TOKEN),
   };
+}
+
+/** Pulls execution time and success out of result payloads that report them. */
+function resultMeta(text: string): Pick<PairedToolCall, "durationMs" | "success"> {
+  try {
+    const value = (JSON.parse(text) as { value?: { tMs?: unknown; success?: unknown } }).value;
+    return {
+      ...(typeof value?.tMs === "number" ? { durationMs: value.tMs } : {}),
+      ...(typeof value?.success === "boolean" ? { success: value.success } : {}),
+    };
+  } catch {
+    return {};
+  }
 }
 
 function normalizeRole(role: string): MessageRole {

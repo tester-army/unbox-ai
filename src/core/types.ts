@@ -100,6 +100,10 @@ export interface PairedToolCall {
   result?: string;
   /** Where the paired result lives in the raw trace, for building `get` pointers. */
   resultRef?: { event: number; message: number };
+  /** Tool execution time in ms, when the result payload reports one (tMs). */
+  durationMs?: number;
+  /** Whether the tool reported success, when the result payload says. */
+  success?: boolean;
 }
 
 export interface TokenBreakdown {

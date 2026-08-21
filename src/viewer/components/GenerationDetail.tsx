@@ -16,18 +16,13 @@ export function GenerationDetail({ generation }: { generation: Generation }) {
         </span>
       </div>
       <p className="type-accent-s text-ta-grey-200">
-        {generation.breakdown.cacheableTokens > 0
-          ? `~${formatPercent(generation.breakdown.cacheableTokens, generation.metrics.inputTokens)} of input is a repeated prefix (cache-eligible) · `
-          : ""}
-        ttft is {formatPercent(generation.metrics.timeToFirstToken, generation.metrics.latency)}{" "}
-        of latency
-      </p>
-      <p className="type-accent-s text-ta-grey-200">
         {generation.carriedMessages > 0
-          ? `${generation.carriedMessages} messages carried from previous generations - showing the ${generation.newMessages.length} new`
-          : `fresh conversation (segment ${generation.segment}) - ${generation.newMessages.length} messages`}
-        {generation.foldedResults > 0 &&
-          ` (${generation.foldedResults} tool result${generation.foldedResults === 1 ? "" : "s"} shown under calls)`}
+          ? `${generation.carriedMessages} carried messages, showing the ${generation.newMessages.length} new`
+          : `fresh conversation (segment ${generation.segment}), ${generation.newMessages.length} messages`}
+        {generation.breakdown.cacheableTokens > 0 &&
+          ` · ${formatPercent(generation.breakdown.cacheableTokens, generation.metrics.inputTokens)} repeated prefix`}
+        {" · ttft "}
+        {formatPercent(generation.metrics.timeToFirstToken, generation.metrics.latency)} of latency
       </p>
       <div className="flex flex-col gap-2">
         {generation.newMessages.map((message) => (

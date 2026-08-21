@@ -38,8 +38,7 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
           {formatSeconds(replay.elapsed)} / {formatSeconds(total)} model time
         </span>
         <span className="type-accent-s ml-auto text-ta-grey-200">
-          dark left of a block = waiting for first token · bottom strip: grey = repeated
-          prefix (cache-eligible), orange = fresh
+          dark = ttft · strip: grey = repeated prefix, orange = fresh
         </span>
       </div>
       <div className="px-6 pb-4">
