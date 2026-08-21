@@ -1,3 +1,4 @@
+import { toolCallNames } from "../../core/normalize";
 import type { LoadedTrace } from "../load";
 import { formatCost, formatSeconds, formatTokens, printJson, table } from "../output";
 
@@ -13,7 +14,7 @@ export function events(loaded: LoadedTrace, json: boolean): void {
         ...gen.metrics,
         toolCount: gen.toolCount,
         newMessages: gen.newMessages.length,
-        toolCalls: gen.newMessages.flatMap((m) => m.toolCalls?.map((c) => c.name) ?? []),
+        toolCalls: toolCallNames(gen),
       })),
     );
     return;
@@ -25,7 +26,7 @@ export function events(loaded: LoadedTrace, json: boolean): void {
     formatTokens(gen.metrics.outputTokens),
     formatSeconds(gen.metrics.latency),
     formatCost(gen.metrics.cost),
-    gen.newMessages.flatMap((m) => m.toolCalls?.map((c) => c.name) ?? []).join(",") || "-",
+    toolCallNames(gen).join(",") || "-",
   ]);
   console.log(table(["idx", "seg", "in", "out", "latency", "cost", "tool calls"], rows));
 }

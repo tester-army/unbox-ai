@@ -1,3 +1,4 @@
+import { toolCallNames } from "../../core/normalize";
 import type { LoadedTrace } from "../load";
 import { formatCost, formatSeconds, formatTokens, printJson } from "../output";
 
@@ -28,8 +29,8 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
   );
   console.log("");
   for (const gen of trace.generations) {
+    const calls = toolCallNames(gen).join(", ");
     const last = gen.newMessages.at(-1);
-    const calls = last?.toolCalls?.map((c) => c.name).join(", ");
     const doing = calls ? `-> ${calls}` : last ? `-> ${last.text.slice(0, 60)}` : "";
     console.log(
       `  [${gen.index}] seg ${gen.segment}  ${formatTokens(gen.metrics.inputTokens)} in  ` +

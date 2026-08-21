@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import type { MessageRole } from "../core/types";
 import { event } from "./commands/event";
 import { events } from "./commands/events";
 import { get } from "./commands/get";
@@ -33,7 +34,7 @@ All read commands print bounded output; truncations include the exact
 
 const COMMANDS = new Set(["view", "summary", "events", "event", "messages", "get"]);
 
-main();
+const ROLES: MessageRole[] = ["system", "user", "assistant", "tool-result", "unknown"];
 
 function main(): void {
   const { values, positionals } = parseArgs({
@@ -69,7 +70,9 @@ function main(): void {
 
   switch (command) {
     case "view":
-      void view(loaded, values);
+      view(loaded, values).catch((error) =>
+        fail(error instanceof Error ? error.message : String(error)),
+      );
       return;
     case "summary":
       summary(loaded, values.json);
@@ -84,7 +87,7 @@ function main(): void {
       messages(
         loaded,
         {
-          role: values.role,
+          role: values.role !== undefined ? parseRole(values.role) : undefined,
           event: values.event !== undefined ? parseIndex(values.event) : undefined,
           grep: values.grep,
           limit: parseIndex(values.limit),
@@ -108,7 +111,7 @@ async function view(
   loaded: ReturnType<typeof loadTrace>,
   values: { port: string; "no-open": boolean },
 ): Promise<void> {
-  const { port } = await startServer(loaded.trace, parseIndex(values.port));
+  const { port } = await startServer(loaded.trace, parsePort(values.port));
   const url = `http://localhost:${port}`;
   console.log(`unbox-ai: serving ${loaded.path} at ${url} (ctrl-c to stop)`);
   if (!values["no-open"]) openBrowser(url);
@@ -122,4 +125,19 @@ function parseIndex(value: string | undefined): number {
   return n;
 }
 
+function parsePort(value: string): number {
+  const port = parseIndex(value);
+  if (port < 1 || port > 65535) fail(`Port out of range 1-65535: ${value}`);
+  return port;
+}
+
+function parseRole(value: string): MessageRole {
+  if (!(ROLES as string[]).includes(value)) {
+    fail(`Unknown role: ${value}. Expected one of: ${ROLES.join(", ")}`);
+  }
+  return value as MessageRole;
+}
+
 declare const VERSION: string;
+
+main();

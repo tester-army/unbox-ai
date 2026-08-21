@@ -1,9 +1,20 @@
 import { Tabs as BaseTabs } from "@base-ui-components/react/tabs";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-function Tabs(props: ComponentProps<typeof BaseTabs.Root>) {
-  return <BaseTabs.Root {...props} />;
+interface TabsProps<T extends string> {
+  value: T;
+  onValueChange: (value: T) => void;
+  children: ReactNode;
+}
+
+/** Typed Tabs root: callers get their union type back without casting. */
+function Tabs<T extends string>({ value, onValueChange, children }: TabsProps<T>) {
+  return (
+    <BaseTabs.Root value={value} onValueChange={(next) => onValueChange(next as T)}>
+      {children}
+    </BaseTabs.Root>
+  );
 }
 
 function TabsList({ className, ...props }: ComponentProps<typeof BaseTabs.List>) {

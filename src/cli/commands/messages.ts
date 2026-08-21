@@ -1,8 +1,9 @@
+import type { MessageRole } from "../../core/types";
 import { fail, type LoadedTrace } from "../load";
-import { formatTokens, printJson, truncate } from "../output";
+import { contentPointer, formatTokens, printJson, truncate } from "../output";
 
 export interface MessagesFilter {
-  role?: string;
+  role?: MessageRole;
   event?: number;
   grep?: string;
   limit: number;
@@ -40,10 +41,11 @@ export function messages(loaded: LoadedTrace, filter: MessagesFilter, json: bool
   }
   for (const hit of shown) {
     const calls = hit.toolCalls?.map((c) => c.name).join(",");
-    const body = hit.text ? hit.text.replace(/\s+/g, " ") : `tool_calls: ${calls}`;
+    const body = hit.text
+      ? truncate(hit.text.replace(/\s+/g, " "), contentPointer(hit.gen, hit.index), 240)
+      : `tool_calls: ${calls} - drill in: unbox-ai event <trace> ${hit.gen}`;
     console.log(
-      `[gen ${hit.gen} msg ${hit.index}] ${hit.role} (~${formatTokens(hit.estTokens)} tok): ` +
-        truncate(body, `events[${hit.gen}].messages[${hit.index}].content`, 240),
+      `[gen ${hit.gen} msg ${hit.index}] ${hit.role} (~${formatTokens(hit.approxTokens)} tok): ${body}`,
     );
   }
   if (hits.length > shown.length) {

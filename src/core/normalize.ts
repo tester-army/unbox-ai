@@ -22,6 +22,8 @@ const CHARS_PER_TOKEN = 4;
  */
 export function normalizeTrace(raw: RawTrace): NormalizedTrace {
   assertTraceShape(raw);
+  // Pair trace-wide: a call made in generation N gets its result from N+1's snapshot
+  const pairing = collectPairing(raw.events);
   const generations: Generation[] = [];
   let segment = 0;
   let prev: RawEvent | undefined;
@@ -30,7 +32,7 @@ export function normalizeTrace(raw: RawTrace): NormalizedTrace {
     const continuesPrev = prev !== undefined && isPrefix(prev.messages, event.messages);
     if (prev !== undefined && !continuesPrev) segment += 1;
     const carried = continuesPrev && prev !== undefined ? prev.messages.length : 0;
-    generations.push(normalizeEvent(event, index, segment, carried));
+    generations.push(normalizeEvent(event, index, segment, carried, pairing));
     prev = event;
   });
 
@@ -57,7 +59,15 @@ export function assertTraceShape(raw: unknown): asserts raw is RawTrace {
     if (!Array.isArray(event?.messages)) {
       throw new Error(`Unsupported trace: events[${i}] has no messages[] array`);
     }
+    if (typeof event.metrics?.tokens?.input !== "number") {
+      throw new Error(`Unsupported trace: events[${i}] has no metrics.tokens`);
+    }
   }
+}
+
+/** Names of the tool calls a generation's new messages make, in order. */
+export function toolCallNames(gen: Generation): string[] {
+  return gen.newMessages.flatMap((m) => m.toolCalls?.map((c) => c.name) ?? []);
 }
 
 function normalizeEvent(
@@ -65,12 +75,14 @@ function normalizeEvent(
   index: number,
   segment: number,
   carried: number,
+  pairing: Pairing,
 ): Generation {
-  const results = collectToolResults(event.messages);
   const newMessages = event.messages
     .slice(carried)
-    .map((message, offset) => normalizeMessage(message, carried + offset, results))
-    .filter((message) => message.role !== "tool-result");
+    .map((message, offset) => ({ raw: message, index: carried + offset }))
+    // paired results render inline under their call; orphans stay visible
+    .filter(({ raw }) => !(isToolResult(raw) && pairing.callIds.has(raw.tool_call_id!)))
+    .map(({ raw, index }) => normalizeMessage(raw, index, pairing.results));
 
   return {
     index,
@@ -98,43 +110,68 @@ function isPrefix(prev: RawMessage[], next: RawMessage[]): boolean {
   return prev.every((message, i) => deepEqual(message, next[i]));
 }
 
-function collectToolResults(messages: RawMessage[]): Map<string, string> {
-  const results = new Map<string, string>();
-  for (const message of messages) {
-    if (message.tool_call_id !== undefined) {
-      results.set(message.tool_call_id, contentToText(message.content));
-    }
-  }
-  return results;
+interface ToolResult {
+  text: string;
+  /** Event and message index of the result's first appearance in the raw trace. */
+  ref: { event: number; message: number };
+}
+
+interface Pairing {
+  /** Every tool call id made anywhere in the trace. */
+  callIds: Set<string>;
+  /** Result of each call, keyed by call id. */
+  results: Map<string, ToolResult>;
+}
+
+function isToolResult(message: RawMessage): boolean {
+  return normalizeRole(message.role) === "tool-result" && message.tool_call_id !== undefined;
+}
+
+function collectPairing(events: RawEvent[]): Pairing {
+  const callIds = new Set<string>();
+  const results = new Map<string, ToolResult>();
+  events.forEach((event, eventIndex) => {
+    event.messages.forEach((message, messageIndex) => {
+      for (const call of message.tool_calls ?? []) callIds.add(call.id);
+      if (isToolResult(message) && !results.has(message.tool_call_id!)) {
+        results.set(message.tool_call_id!, {
+          text: contentToText(message.content),
+          ref: { event: eventIndex, message: messageIndex },
+        });
+      }
+    });
+  });
+  return { callIds, results };
 }
 
 function normalizeMessage(
   raw: RawMessage,
   index: number,
-  results: Map<string, string>,
+  results: Map<string, ToolResult>,
 ): Message {
   const text = contentToText(raw.content);
-  const toolCalls = raw.tool_calls?.map(
-    (call): PairedToolCall => ({
+  const toolCalls = raw.tool_calls?.map((call): PairedToolCall => {
+    const result = results.get(call.id);
+    return {
       id: call.id,
       name: call.function.name,
       args: call.function.arguments,
-      result: results.get(call.id),
-    }),
-  );
+      ...(result ? { result: result.text, resultRef: result.ref } : {}),
+    };
+  });
   return {
     index,
     role: normalizeRole(raw.role),
     text,
     ...(toolCalls?.length ? { toolCalls } : {}),
-    estTokens: Math.round(messageChars(raw) / CHARS_PER_TOKEN),
+    approxTokens: Math.round(messageChars(raw) / CHARS_PER_TOKEN),
   };
 }
 
 function normalizeRole(role: string): MessageRole {
   if (role === "assistant (tool result)" || role === "tool") return "tool-result";
   if (role === "system" || role === "user" || role === "assistant") return role;
-  return "user";
+  return "unknown";
 }
 
 /** Flattens the content field (string or typed parts array) into plain text. */
@@ -183,6 +220,7 @@ function buildBreakdown(event: RawEvent, segment: number): {
       id: `${role === "system" ? "system" : "msg"}:${segment}:${index}`,
       label: role === "system" ? `system #${index + 1}` : `#${index + 1} ${role}`,
       role,
+      segment,
       chars,
       estTokens: 0,
       preview: preview(message),

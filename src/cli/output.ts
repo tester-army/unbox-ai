@@ -1,4 +1,14 @@
-export { formatCost, formatSeconds, formatTokens } from "../core/format";
+export { formatCompact, formatCost, formatSeconds, formatTokens } from "../core/format";
+
+/** Canonical `get` pointer to a message's content. */
+export function contentPointer(genIndex: number, messageIndex: number): string {
+  return `events[${genIndex}].messages[${messageIndex}].content`;
+}
+
+/** Canonical `get` pointer to a tool call's arguments. */
+export function argsPointer(genIndex: number, messageIndex: number, callIndex: number): string {
+  return `events[${genIndex}].messages[${messageIndex}].tool_calls[${callIndex}].function.arguments`;
+}
 
 /** Hard cap on any single text field printed to stdout, so agent context stays bounded. */
 const MAX_FIELD_CHARS = 1500;

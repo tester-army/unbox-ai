@@ -7,6 +7,7 @@ import { useElementSize } from "@/lib/use-element-size";
 import { cn } from "@/lib/utils";
 
 const GROUP_HEADER = 20;
+const HEIGHT = 380;
 
 const GROUP_STYLE: Record<BreakdownGroupKey, { block: string; label: string }> = {
   system: { block: "bg-ta-sand-300/25 hover:bg-ta-sand-300/40", label: "text-ta-sand-300" },
@@ -14,101 +15,120 @@ const GROUP_STYLE: Record<BreakdownGroupKey, { block: string; label: string }> =
   conversation: { block: "bg-ta-grey-300/25 hover:bg-ta-grey-300/40", label: "text-ta-grey-100" },
 };
 
-interface TreemapNode {
-  key?: BreakdownGroupKey;
-  leaf?: TreemapLeaf;
-  children?: TreemapNode[];
-}
+type TreemapNode =
+  | { children: TreemapNode[] }
+  | { group: TreemapGroupData; children: TreemapNode[] }
+  | { leaf: TreemapLeaf };
 
 interface TreemapProps {
   groups: TreemapGroupData[];
-  onInspect: (leaf: TreemapLeaf | null) => void;
+  onInspect: (leafId: string | null) => void;
 }
 
 /** Squarified treemap rendered as plain divs - square corners, borders for depth. */
 export function Treemap({ groups, onInspect }: TreemapProps) {
   const { ref, width } = useElementSize<HTMLDivElement>();
-  const height = 380;
 
-  const leaves = useMemo(() => {
-    if (width === 0) return [];
-    const root = hierarchy<TreemapNode>({
-      children: groups.map((group) => ({
-        key: group.key,
-        children: group.leaves.map((leaf) => ({ leaf })),
-      })),
-    })
-      .sum((node) => node.leaf?.value ?? 0)
+  const laidOut = useMemo(() => {
+    if (width === 0) return null;
+    const root = hierarchy<TreemapNode>(
+      {
+        children: groups.map((group) => ({
+          group,
+          children: group.leaves.map((leaf) => ({ leaf })),
+        })),
+      },
+      (node) => ("children" in node ? node.children : undefined),
+    )
+      .sum((node) => ("leaf" in node ? node.leaf.value : 0))
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-    treemap<TreemapNode>()
+    return treemap<TreemapNode>()
       .tile(treemapSquarify)
-      .size([width, height])
+      .size([width, HEIGHT])
       .paddingInner(2)
       .paddingTop((node) => (node.depth === 1 ? GROUP_HEADER : 0))(root);
-    return root.descendants().filter((node) => node.depth > 0) as HierarchyRectangularNode<TreemapNode>[];
-  }, [groups, width, height]);
+  }, [groups, width]);
 
   return (
     <div
       ref={ref}
       className="relative w-full border border-ta-grey-400 bg-ta-grey-450"
-      style={{ height }}
+      style={{ height: HEIGHT }}
       onMouseLeave={() => onInspect(null)}
     >
-      {leaves.map((node) => {
-        const w = node.x1 - node.x0;
-        const h = node.y1 - node.y0;
-        if (w <= 0 || h <= 0) return null;
-        if (node.depth === 1) {
-          const key = node.data.key!;
-          return (
-            <div
-              key={key}
-              className="absolute border border-ta-grey-400"
-              style={{ left: node.x0, top: node.y0, width: w, height: h }}
-            >
-              {w > 70 && (
-                <span
-                  className={cn(
-                    "type-accent-s absolute left-1 top-0.5",
-                    GROUP_STYLE[key].label,
-                  )}
-                >
-                  {key} ~{formatTokens(sumTokens(node))}
-                </span>
-              )}
-            </div>
-          );
-        }
-        const leaf = node.data.leaf!;
-        const style = GROUP_STYLE[leaf.group];
+      {laidOut?.children?.map((groupNode) => {
+        const data = groupNode.data;
+        if (!("group" in data)) return null;
         return (
-          <div
-            key={leaf.id}
-            className={cn("absolute cursor-default overflow-hidden transition-colors", style.block)}
-            style={{ left: node.x0, top: node.y0, width: w, height: h }}
-            onMouseEnter={() => onInspect(leaf)}
-            title={`${leaf.label} ~${formatTokens(leaf.estTokens)} tok`}
-          >
-            {w > 56 && h > 26 && (
-              <span className="type-accent-s block truncate px-1 pt-0.5 text-ta-sand-50">
-                {leaf.label}
-              </span>
-            )}
-            {w > 56 && h > 42 && (
-              <span className="type-accent-s block px-1 text-ta-grey-100">
-                {formatTokens(leaf.estTokens)}
-              </span>
-            )}
-          </div>
+          <GroupBlock key={data.group.key} node={groupNode} group={data.group}>
+            {groupNode.children?.map((leafNode) => {
+              const leafData = leafNode.data;
+              if (!("leaf" in leafData)) return null;
+              return <LeafBlock key={leafData.leaf.id} node={leafNode} leaf={leafData.leaf} onInspect={onInspect} />;
+            })}
+          </GroupBlock>
         );
       })}
     </div>
   );
 }
 
-function sumTokens(node: HierarchyRectangularNode<TreemapNode>): number {
-  return node
-    .leaves()
-    .reduce((acc, leaf) => acc + (leaf.data.leaf?.estTokens ?? 0), 0);
+interface GroupBlockProps {
+  node: HierarchyRectangularNode<TreemapNode>;
+  group: TreemapGroupData;
+  children: React.ReactNode;
+}
+
+function GroupBlock({ node, group, children }: GroupBlockProps) {
+  const width = node.x1 - node.x0;
+  if (width <= 0 || node.y1 - node.y0 <= 0) return null;
+  return (
+    <>
+      <div
+        className="absolute border border-ta-grey-400"
+        style={{ left: node.x0, top: node.y0, width, height: node.y1 - node.y0 }}
+      >
+        {width > 70 && (
+          <span className={cn("type-accent-s absolute left-1 top-0.5", GROUP_STYLE[group.key].label)}>
+            {group.key} ~{formatTokens(group.estTokens)}
+          </span>
+        )}
+      </div>
+      {children}
+    </>
+  );
+}
+
+interface LeafBlockProps {
+  node: HierarchyRectangularNode<TreemapNode>;
+  leaf: TreemapLeaf;
+  onInspect: (leafId: string) => void;
+}
+
+function LeafBlock({ node, leaf, onInspect }: LeafBlockProps) {
+  const width = node.x1 - node.x0;
+  const height = node.y1 - node.y0;
+  if (width <= 0 || height <= 0) return null;
+  return (
+    <div
+      className={cn(
+        "absolute cursor-default overflow-hidden transition-colors",
+        GROUP_STYLE[leaf.group].block,
+      )}
+      style={{ left: node.x0, top: node.y0, width, height }}
+      onMouseEnter={() => onInspect(leaf.id)}
+      title={`${leaf.label} ~${formatTokens(leaf.estTokens)} tok`}
+    >
+      {width > 56 && height > 26 && (
+        <span className="type-accent-s block truncate px-1 pt-0.5 text-ta-sand-50">
+          {leaf.label}
+        </span>
+      )}
+      {width > 56 && height > 42 && (
+        <span className="type-accent-s block px-1 text-ta-grey-100">
+          {formatTokens(leaf.estTokens)}
+        </span>
+      )}
+    </div>
+  );
 }

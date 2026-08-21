@@ -5,7 +5,6 @@ import { Treemap } from "@/components/Treemap";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildTreemapData,
-  type TreemapLeaf,
   type TreemapScope,
   type TreemapSizeBy,
 } from "@/lib/treemap-data";
@@ -19,13 +18,16 @@ interface TreemapSectionProps {
 export function TreemapSection({ trace, generation }: TreemapSectionProps) {
   const [scope, setScope] = useState<TreemapScope>("generation");
   const [sizeBy, setSizeBy] = useState<TreemapSizeBy>("tokens");
-  const [inspected, setInspected] = useState<TreemapLeaf | null>(null);
+  const [inspectedId, setInspectedId] = useState<string | null>(null);
 
   const groups = useMemo(
     () => buildTreemapData(trace, generation, scope, sizeBy),
     [trace, generation, scope, sizeBy],
   );
-  const totalTokens = groups.flatMap((g) => g.leaves).reduce((acc, l) => acc + l.estTokens, 0);
+  const leaves = groups.flatMap((g) => g.leaves);
+  const totalTokens = leaves.reduce((acc, l) => acc + l.estTokens, 0);
+  // derived, so the inspector can never show a leaf from stale treemap data
+  const inspected = leaves.find((leaf) => leaf.id === inspectedId) ?? null;
 
   return (
     <section className="border-b border-ta-grey-400">
@@ -37,13 +39,13 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
             : "all generations summed, est per block"}
         </p>
         <div className="ml-auto flex gap-2">
-          <Tabs value={scope} onValueChange={(v) => setScope(v as TreemapScope)}>
+          <Tabs value={scope} onValueChange={setScope}>
             <TabsList>
               <TabsTrigger value="generation">generation</TabsTrigger>
               <TabsTrigger value="cumulative">cumulative</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Tabs value={sizeBy} onValueChange={(v) => setSizeBy(v as TreemapSizeBy)}>
+          <Tabs value={sizeBy} onValueChange={setSizeBy}>
             <TabsList>
               <TabsTrigger value="tokens">tokens</TabsTrigger>
               <TabsTrigger value="cost">cost</TabsTrigger>
@@ -52,7 +54,7 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
         </div>
       </div>
       <div className="px-6 pb-3">
-        <Treemap groups={groups} onInspect={setInspected} />
+        <Treemap groups={groups} onInspect={setInspectedId} />
         <div className="type-accent-s mt-2 flex min-h-10 items-start gap-4 border border-ta-grey-400 bg-ta-grey-450 px-3 py-2 text-ta-grey-100">
           {inspected ? (
             <>

@@ -21,7 +21,8 @@ export interface TreemapLeaf {
 
 export interface TreemapGroupData {
   key: BreakdownGroupKey;
-  total: number;
+  /** Sum of the group's leaf token estimates, for the group header. */
+  estTokens: number;
   leaves: TreemapLeaf[];
 }
 
@@ -54,7 +55,10 @@ export function buildTreemapData(
         } else {
           leaves.set(item.id, {
             id: item.id,
-            label: leafLabel(item.id, item.label, scope),
+            label:
+              scope === "cumulative" && item.segment !== undefined
+                ? `${item.label} · seg ${item.segment}`
+                : item.label,
             group: group.key,
             value,
             estTokens: item.estTokens,
@@ -66,24 +70,13 @@ export function buildTreemapData(
     }
   }
 
-  return groupLeaves(leaves);
-}
-
-/** Message/system ids embed their segment ("system:1:0"); cumulative view needs it visible. */
-function leafLabel(id: string, label: string, scope: TreemapScope): string {
-  if (scope !== "cumulative" || id.startsWith("tool:")) return label;
-  const segment = id.split(":")[1];
-  return `${label} · seg ${segment}`;
-}
-
-function groupLeaves(leaves: Map<string, TreemapLeaf>): TreemapGroupData[] {
   const keys: BreakdownGroupKey[] = ["system", "tools", "conversation"];
   return keys
     .map((key) => {
       const groupLeaves = [...leaves.values()].filter((leaf) => leaf.group === key);
       return {
         key,
-        total: groupLeaves.reduce((acc, leaf) => acc + leaf.value, 0),
+        estTokens: groupLeaves.reduce((acc, leaf) => acc + leaf.estTokens, 0),
         leaves: groupLeaves,
       };
     })

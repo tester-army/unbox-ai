@@ -1,6 +1,16 @@
 import type { Message } from "../../core/types";
 import { fail, type LoadedTrace } from "../load";
-import { formatCost, formatSeconds, formatTokens, printJson, truncate } from "../output";
+import {
+  argsPointer,
+  contentPointer,
+  formatCost,
+  formatSeconds,
+  formatTokens,
+  printJson,
+  truncate,
+} from "../output";
+
+const TOOL_FIELD_CHARS = 400;
 
 /** Prints one generation: metrics, token breakdown, and new-vs-previous messages. */
 export function event(loaded: LoadedTrace, index: number, json: boolean): void {
@@ -30,14 +40,22 @@ export function event(loaded: LoadedTrace, index: number, json: boolean): void {
 }
 
 function printMessage(message: Message, genIndex: number): void {
-  const pointer = `events[${genIndex}].messages[${message.index}].content`;
-  console.log(`--- [${message.index}] ${message.role} (~${formatTokens(message.estTokens)} tok)`);
-  if (message.text) console.log(truncate(message.text, pointer));
-  for (const call of message.toolCalls ?? []) {
-    console.log(`  tool_call ${call.name}(${truncate(JSON.stringify(call.args), undefined, 400)})`);
+  console.log(`--- [${message.index}] ${message.role} (~${formatTokens(message.approxTokens)} tok)`);
+  if (message.text) console.log(truncate(message.text, contentPointer(genIndex, message.index)));
+  message.toolCalls?.forEach((call, callIndex) => {
+    console.log(
+      `  tool_call ${call.name}(${truncate(
+        JSON.stringify(call.args),
+        argsPointer(genIndex, message.index, callIndex),
+        TOOL_FIELD_CHARS,
+      )})`,
+    );
     if (call.result !== undefined) {
-      console.log(`  result: ${truncate(call.result, undefined, 400)}`);
+      const pointer = call.resultRef
+        ? contentPointer(call.resultRef.event, call.resultRef.message)
+        : undefined;
+      console.log(`  result: ${truncate(call.result, pointer, TOOL_FIELD_CHARS)}`);
     }
-  }
+  });
   console.log("");
 }

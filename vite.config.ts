@@ -15,15 +15,23 @@ function devTraceApi(): Plugin {
     async configureServer(server) {
       const { normalizeTrace } = await import("./src/core/normalize");
       server.middlewares.use("/api/trace", (_req, res) => {
+        const sendError = (message: string) => {
+          res.statusCode = 500;
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify({ error: message }));
+        };
         const tracePath = process.env.UNBOX_TRACE;
         if (!tracePath) {
-          res.statusCode = 404;
-          res.end(JSON.stringify({ error: "Set UNBOX_TRACE=<file> to serve a trace in dev" }));
+          sendError("Set UNBOX_TRACE=<file> to serve a trace in dev");
           return;
         }
-        const raw = JSON.parse(readFileSync(tracePath, "utf8"));
-        res.setHeader("content-type", "application/json");
-        res.end(JSON.stringify(normalizeTrace(raw)));
+        try {
+          const raw = JSON.parse(readFileSync(tracePath, "utf8"));
+          res.setHeader("content-type", "application/json");
+          res.end(JSON.stringify(normalizeTrace(raw)));
+        } catch (error) {
+          sendError(error instanceof Error ? error.message : String(error));
+        }
       });
     },
   };

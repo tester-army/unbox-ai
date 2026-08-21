@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { toolCallNames } from "@core/normalize";
 import type { NormalizedTrace } from "@core/types";
 import { formatCost, formatSeconds, formatTokens } from "@core/format";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,7 @@ interface WaterfallProps {
 
 /** One row per generation: latency bar with TTFT tick, tokens, cost. */
 export function Waterfall({ trace, selectedIndex, onSelect }: WaterfallProps) {
-  const maxLatency = Math.max(...trace.generations.map((g) => g.metrics.latency));
+  const maxLatency = Math.max(...trace.generations.map((g) => g.metrics.latency)) || 1;
   return (
     <div className="flex flex-col">
       <p className="type-accent-s border-b border-ta-grey-400 px-4 py-3 text-ta-grey-200">
@@ -19,7 +20,7 @@ export function Waterfall({ trace, selectedIndex, onSelect }: WaterfallProps) {
       </p>
       {trace.generations.map((gen, i) => {
         const newSegment = i === 0 || trace.generations[i - 1]?.segment !== gen.segment;
-        const calls = gen.newMessages.flatMap((m) => m.toolCalls?.map((c) => c.name) ?? []);
+        const calls = toolCallNames(gen);
         return (
           <Fragment key={gen.index}>
             {newSegment && (

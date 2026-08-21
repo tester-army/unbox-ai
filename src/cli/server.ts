@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { readFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NormalizedTrace } from "../core/types";
 
@@ -37,9 +37,15 @@ export async function startServer(
       res.end(traceJson);
       return;
     }
-    const requested = url.pathname === "/" ? "/index.html" : url.pathname;
+    let requested: string;
+    try {
+      requested = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
+    } catch {
+      res.writeHead(400).end();
+      return;
+    }
     const path = normalize(join(dir, requested));
-    if (!path.startsWith(dir)) {
+    if (path !== dir && !path.startsWith(dir + sep)) {
       res.writeHead(403).end();
       return;
     }
@@ -48,12 +54,12 @@ export async function startServer(
       res.writeHead(200, { "content-type": MIME[extname(path)] ?? "application/octet-stream" });
       res.end(body);
     } catch {
-      // SPA fallback keeps deep links working
-      const index = await readFile(join(dir, "index.html")).catch(() => null);
+      // SPA fallback for extension-less deep links only; missing assets stay a hard 404
+      const index = extname(path) === "" && (await readFile(join(dir, "index.html")).catch(() => null));
       if (index) {
         res.writeHead(200, { "content-type": "text/html" }).end(index);
       } else {
-        res.writeHead(404).end("unbox-ai: viewer assets not found - reinstall the package");
+        res.writeHead(404).end("unbox-ai: not found");
       }
     }
   });
@@ -62,15 +68,28 @@ export async function startServer(
   return { server, port };
 }
 
-function listen(server: Server, port: number, attempts = 10): Promise<number> {
+async function listen(server: Server, preferredPort: number): Promise<number> {
+  const MAX_ATTEMPTS = 10;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const port = preferredPort + attempt;
+    try {
+      await tryListen(server, port);
+      return port;
+    } catch (error) {
+      const busy = (error as NodeJS.ErrnoException).code === "EADDRINUSE";
+      if (!busy || attempt === MAX_ATTEMPTS - 1) throw error;
+    }
+  }
+  throw new Error("unreachable");
+}
+
+function tryListen(server: Server, port: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    server.once("error", (error: NodeJS.ErrnoException) => {
-      if (error.code === "EADDRINUSE" && attempts > 0) {
-        resolve(listen(server, port + 1, attempts - 1));
-      } else {
-        reject(error);
-      }
+    const onError = (error: Error) => reject(error);
+    server.once("error", onError);
+    server.listen(port, "127.0.0.1", () => {
+      server.off("error", onError);
+      resolve();
     });
-    server.listen(port, "127.0.0.1", () => resolve(port));
   });
 }

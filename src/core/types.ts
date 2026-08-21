@@ -19,7 +19,7 @@ export interface RawEvent {
     tokens: { input: number; output: number };
     cost: number;
   };
-  available_tools: RawToolDef[];
+  available_tools?: RawToolDef[];
   messages: RawMessage[];
 }
 
@@ -79,7 +79,7 @@ export interface Generation {
   breakdown: TokenBreakdown;
 }
 
-export type MessageRole = "system" | "user" | "assistant" | "tool-result";
+export type MessageRole = "system" | "user" | "assistant" | "tool-result" | "unknown";
 
 export interface Message {
   /** Position in the raw event messages array. */
@@ -87,7 +87,8 @@ export interface Message {
   role: MessageRole;
   text: string;
   toolCalls?: PairedToolCall[];
-  estTokens: number;
+  /** Rough size estimate (chars/4), not scaled to reported totals. */
+  approxTokens: number;
 }
 
 export interface PairedToolCall {
@@ -95,6 +96,8 @@ export interface PairedToolCall {
   name: string;
   args: unknown;
   result?: string;
+  /** Where the paired result lives in the raw trace, for building `get` pointers. */
+  resultRef?: { event: number; message: number };
 }
 
 export interface TokenBreakdown {
@@ -116,6 +119,8 @@ export interface BreakdownItem {
   id: string;
   label: string;
   role?: MessageRole;
+  /** Segment the item belongs to; absent for tools, which are segment-independent. */
+  segment?: number;
   chars: number;
   /** Scaled so all items of a generation sum to reported input tokens. */
   estTokens: number;
