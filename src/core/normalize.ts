@@ -245,7 +245,7 @@ function normalizeEvent(
     .map((message, offset) => ({ raw: message, index: carried + offset }))
     // paired results render inline under their call; orphans stay visible
     .filter(({ raw }) => !(isToolResult(raw) && pairing.callIds.has(`${segment}:${raw.tool_call_id}`)))
-    .map(({ raw, index }) => normalizeMessage(raw, index, segment, pairing.results));
+    .map(({ raw, index }) => normalizeMessage(raw, index, segment, pairing));
 
   return {
     index,
@@ -284,6 +284,12 @@ interface Pairing {
   callIds: Set<string>;
   /** Result of each call, keyed "segment:id". */
   results: Map<string, ToolResult>;
+  /**
+   * First non-empty arguments seen per call, keyed "segment:id". Streaming
+   * snapshots capture the newest call with empty args; a later snapshot has
+   * the completed value.
+   */
+  args: Map<string, unknown>;
 }
 
 function isToolResult(message: RawMessage): message is RawMessage & { tool_call_id: string } {
@@ -293,10 +299,17 @@ function isToolResult(message: RawMessage): message is RawMessage & { tool_call_
 function collectPairing(events: RawEvent[], positions: EventPosition[]): Pairing {
   const callIds = new Set<string>();
   const results = new Map<string, ToolResult>();
+  const args = new Map<string, unknown>();
   events.forEach((event, eventIndex) => {
     const segment = positions[eventIndex]!.segment;
     event.messages.forEach((message, messageIndex) => {
-      for (const call of message.tool_calls ?? []) callIds.add(`${segment}:${call.id}`);
+      for (const call of message.tool_calls ?? []) {
+        const key = `${segment}:${call.id}`;
+        callIds.add(key);
+        if (!args.has(key) && !isEmptyArgs(call.function.arguments)) {
+          args.set(key, call.function.arguments);
+        }
+      }
       if (isToolResult(message) && !results.has(`${segment}:${message.tool_call_id}`)) {
         results.set(`${segment}:${message.tool_call_id}`, {
           text: contentToText(message.content),
@@ -307,22 +320,27 @@ function collectPairing(events: RawEvent[], positions: EventPosition[]): Pairing
       }
     });
   });
-  return { callIds, results };
+  return { callIds, results, args };
 }
 
 function normalizeMessage(
   raw: RawMessage,
   index: number,
   segment: number,
-  results: Map<string, ToolResult>,
+  pairing: Pairing,
 ): Message {
   const text = contentToText(raw.content);
   const toolCalls = raw.tool_calls?.map((call): PairedToolCall => {
-    const result = results.get(`${segment}:${call.id}`);
+    const key = `${segment}:${call.id}`;
+    const result = pairing.results.get(key);
     return {
       id: call.id,
       name: call.function.name,
-      args: call.function.arguments,
+      // streaming snapshots capture the newest call with empty args; a later
+      // snapshot has the completed value
+      args: isEmptyArgs(call.function.arguments)
+        ? (pairing.args.get(key) ?? call.function.arguments)
+        : call.function.arguments,
       ...(result
         ? {
             result: result.text,

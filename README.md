@@ -33,6 +33,7 @@ The same binary is a bounded, read-only trace explorer - safe to allowlist:
 unbox-ai summary trace.json          # totals + one line per generation
 unbox-ai events trace.json           # table: tokens, latency, cost, tool calls
 unbox-ai event trace.json 5          # one generation, new messages only
+unbox-ai tools trace.json            # every tool call: status, time, size, args
 unbox-ai messages trace.json --grep "error" --role assistant --limit 10
 unbox-ai get trace.json 'events[5].messages[10].tool_calls[0]'
 ```

@@ -1,5 +1,5 @@
 import type { Message, MessageRole } from "../../core/types";
-import { fail, type LoadedTrace } from "../load";
+import type { LoadedTrace } from "../load";
 import { contentPointer, formatTokens, printJson, truncate } from "../output";
 
 export interface MessagesFilter {
@@ -16,7 +16,8 @@ export function messages(loaded: LoadedTrace, filter: MessagesFilter, json: bool
     try {
       pattern = new RegExp(filter.grep, "i");
     } catch {
-      fail(`Invalid regex: ${filter.grep}`);
+      // not a valid regex - fall back to a literal, case-insensitive search
+      pattern = new RegExp(filter.grep.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     }
   }
 

@@ -5,6 +5,7 @@ import { events } from "./commands/events";
 import { get } from "./commands/get";
 import { messages } from "./commands/messages";
 import { summary } from "./commands/summary";
+import { tools } from "./commands/tools";
 import { fail, loadTrace } from "./load";
 import { openBrowser } from "./open-browser";
 import { startServer } from "./server";
@@ -17,6 +18,7 @@ Usage:
   unbox-ai summary <trace.json>          totals + one line per generation
   unbox-ai events <trace.json>           generation table (tokens, latency, cost, tool calls)
   unbox-ai event <trace.json> <idx>      one generation: metrics, token split, new messages
+  unbox-ai tools <trace.json>            every tool call: status, time, size, args
   unbox-ai messages <trace.json>         search messages (--role, --event, --grep, --limit)
   unbox-ai get <trace.json> <path>       raw value at a path, e.g. events[3].messages[2].content
 
@@ -26,14 +28,14 @@ Options:
   --no-open       start the server without opening a browser
   --role <r>      filter: system | user | assistant | tool-result | unknown
   --event <n>     filter: only messages of generation n
-  --grep <re>     filter: case-insensitive regex over content and tool calls
+  --grep <q>      filter: case-insensitive regex (literal fallback) over content and tool calls
   --limit <n>     max messages printed (default 30)
 
 Plain output is bounded; truncations include the exact "get" invocation
 that returns the rest. --json is complete and therefore unbounded.
 All commands are read-only - safe for agents to run freely.`;
 
-const COMMANDS = new Set(["view", "summary", "events", "event", "messages", "get"]);
+const COMMANDS = new Set(["view", "summary", "events", "event", "tools", "messages", "get"]);
 
 const ROLES: MessageRole[] = ["system", "user", "assistant", "tool-result", "unknown"];
 
@@ -83,6 +85,9 @@ function main(): void {
       return;
     case "event":
       event(loaded, parseIndex(arg), values.json);
+      return;
+    case "tools":
+      tools(loaded, values.json);
       return;
     case "messages":
       messages(
