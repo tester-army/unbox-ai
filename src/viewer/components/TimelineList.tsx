@@ -89,9 +89,10 @@ export function TimelineList({
   }, [trace, starts]);
 
   // keep the selected generation in view however it changed: playback,
-  // scrubbing, or a jump from the sidebar
+  // scrubbing, or a jump from the sidebar - smooth so scrubbing glides
+  // instead of snapping row to row
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: "nearest" });
+    selectedRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [selectedIndex]);
 
   const track = (fraction: number) => `calc(${LABEL_W} + (100% - ${LABEL_W}) * ${fraction})`;

@@ -32,7 +32,7 @@ function TabsTrigger({ className, ...props }: ComponentProps<typeof BaseTabs.Tab
       className={cn(
         // h-7 minus the list's 1px borders keeps tab groups exactly as tall as buttons
         "type-accent-s inline-flex h-[calc(--spacing(7)-2px)] cursor-pointer items-center px-3 text-ta-grey-200 transition-colors",
-        "hover:text-ta-sand-50 data-[selected]:bg-ta-sand-50 data-[selected]:text-ta-grey-500",
+        "hover:text-ta-sand-50 aria-selected:bg-ta-sand-50 aria-selected:text-ta-grey-500",
         className,
       )}
       {...props}
