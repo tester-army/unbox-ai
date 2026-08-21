@@ -49,6 +49,8 @@ export function TimelineList({
   const selectedRef = useRef<HTMLButtonElement>(null);
   const [openCall, setOpenCall] = useState<{ call: PairedToolCall; gen: number } | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [overTool, setOverTool] = useState(false);
 
   const rows = useMemo(() => {
     const out: TimelineRow[] = [];
@@ -123,18 +125,18 @@ export function TimelineList({
     return map;
   }, [rows]);
 
-  /** Finds the row under the pointer through the scrub overlay. */
-  const rowKeyUnderPointer = (e: React.PointerEvent<HTMLDivElement>): string | null => {
+  /** Finds the block (bar or dot) under the pointer through the scrub overlay. */
+  const blockKeyUnderPointer = (e: React.PointerEvent<HTMLDivElement>): string | null => {
     const overlay = e.currentTarget;
     overlay.style.pointerEvents = "none";
-    const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-row-key]");
+    const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-block]");
     overlay.style.pointerEvents = "";
-    return hit?.getAttribute("data-row-key") ?? null;
+    return hit?.getAttribute("data-block") ?? null;
   };
 
-  /** Opens the tool row under the pointer; returns false when none is there. */
+  /** Opens the tool block under the pointer; returns false when none is there. */
   const openToolUnderPointer = (e: React.PointerEvent<HTMLDivElement>): boolean => {
-    const key = rowKeyUnderPointer(e);
+    const key = blockKeyUnderPointer(e);
     const entry = key ? callsByKey.get(key) : undefined;
     if (entry) setOpenCall(entry);
     return entry !== undefined;
@@ -148,7 +150,10 @@ export function TimelineList({
       <div className="relative">
         {/* the track region is a video-style scrub surface; labels stay clickable */}
         <div
-          className="absolute inset-y-0 right-0 z-10 cursor-ew-resize"
+          className={cn(
+            "absolute inset-y-0 right-0 z-10",
+            dragging ? "cursor-ew-resize" : overTool ? "cursor-pointer" : "cursor-default",
+          )}
           style={{ left: LABEL_W }}
           onPointerDown={(e) => {
             try {
@@ -161,27 +166,31 @@ export function TimelineList({
           onPointerMove={(e) => {
             const down = downAt.current;
             if (!down || e.buttons !== 1) {
-              // hovering the track: surface the row's tooltip (tool + params)
-              const key = rowKeyUnderPointer(e);
+              // hovering a block shows its tooltip; empty track stays quiet
+              const key = blockKeyUnderPointer(e);
               const text = key ? tipsByKey.get(key) : undefined;
               setTip(text ? { x: e.clientX, y: e.clientY, text } : null);
+              setOverTool(key !== null && callsByKey.has(key));
               return;
             }
             if (!down.moved && Math.abs(e.clientX - down.x) < 4 && Math.abs(e.clientY - down.y) < 4) {
               return;
             }
             down.moved = true;
+            setDragging(true);
             setTip(null);
             scrubFromEvent(e);
           }}
           onPointerUp={(e) => {
             const down = downAt.current;
             downAt.current = null;
+            setDragging(false);
             if (!down) return;
             if (down.moved) return;
             // a click: open the tool under the pointer, else seek there
             if (!openToolUnderPointer(e)) scrubFromEvent(e);
           }}
+          onMouseLeave={() => setOverTool(false)}
         />
         {ticks.map((t) => (
           <span
@@ -223,8 +232,6 @@ export function TimelineList({
             <button
               key={row.key}
               ref={!isTool && selected ? selectedRef : undefined}
-              data-tool-key={isTool ? row.key : undefined}
-              data-row-key={row.key}
               onClick={() => {
                 onSelect(row.gen);
                 if (isTool) setOpenCall({ call: row.call, gen: row.gen });
@@ -260,6 +267,7 @@ export function TimelineList({
               <span className="relative h-full min-w-0 flex-1">
                 {isTool ? (
                   <span
+                    data-block={row.key}
                     className={cn(
                       "absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2",
                       row.call.success === false
@@ -272,6 +280,7 @@ export function TimelineList({
                   />
                 ) : (
                   <span
+                    data-block={row.key}
                     className={cn(
                       "absolute top-1/2 h-3.5 -translate-y-1/2",
                       selected ? "bg-ta-orange-300" : "bg-ta-grey-300",
