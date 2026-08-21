@@ -28,7 +28,7 @@ export function DefinitionDialog({ leaf, onClose }: { leaf: TreemapLeaf; onClose
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <div className="flex items-baseline gap-4 border-b border-ta-grey-400 px-4 py-3">
+        <div className="flex items-baseline gap-4 border-b border-ta-grey-400 px-6 py-4">
           <DialogTitle>{leaf.label}</DialogTitle>
           <span className="type-accent-s text-ta-grey-200">{leaf.ref}</span>
           <Button className="ml-auto border-none" onClick={() => setShowRaw((v) => !v)}>
@@ -36,7 +36,7 @@ export function DefinitionDialog({ leaf, onClose }: { leaf: TreemapLeaf; onClose
           </Button>
           <DialogClose render={<Button className="border-none">close</Button>} />
         </div>
-        <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
+        <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
           {error ? (
             <p className="type-body-s text-ta-error">{error}</p>
           ) : value === undefined ? (
@@ -67,18 +67,18 @@ function ToolDefinition({ tool }: { tool: RawToolDef }) {
   const properties = Object.entries(schema?.properties ?? {});
   const required = new Set(schema?.required ?? []);
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {tool.description && (
-        <p className="type-body-s whitespace-pre-wrap text-ta-grey-100">{tool.description}</p>
+        <p className="type-body-m whitespace-pre-wrap text-ta-grey-100">{tool.description}</p>
       )}
       {properties.length > 0 ? (
         <div>
-          <p className="type-accent-s mb-1 text-ta-grey-200">parameters</p>
+          <p className="type-accent-s mb-2 text-ta-grey-200">parameters</p>
           <div className="border border-ta-grey-400">
             {properties.map(([name, prop]) => (
               <div
                 key={name}
-                className="grid grid-cols-[minmax(8rem,14rem)_6rem_1fr] gap-x-4 border-b border-ta-grey-450 px-3 py-1.5 last:border-b-0"
+                className="grid grid-cols-[minmax(8rem,14rem)_6rem_1fr] items-baseline gap-x-6 border-b border-ta-grey-450 px-4 py-3 last:border-b-0"
               >
                 <span className="type-accent-s truncate text-ta-sand-50">
                   {name}
@@ -91,7 +91,7 @@ function ToolDefinition({ tool }: { tool: RawToolDef }) {
               </div>
             ))}
           </div>
-          <p className="type-accent-s mt-1 text-ta-grey-200">
+          <p className="type-accent-s mt-2 text-ta-grey-200">
             <span className="text-ta-orange-300">*</span> required
           </p>
         </div>
@@ -105,10 +105,10 @@ function ToolDefinition({ tool }: { tool: RawToolDef }) {
 function MessageDefinition({ message }: { message: RawMessage }) {
   const text = prettyPayload(contentToText(message.content));
   return (
-    <div className="flex flex-col gap-3">
-      {text && <p className="type-body-s whitespace-pre-wrap text-ta-grey-100">{text}</p>}
+    <div className="flex flex-col gap-5">
+      {text && <p className="type-body-m whitespace-pre-wrap text-ta-grey-100">{text}</p>}
       {message.tool_calls?.map((call) => (
-        <div key={call.id} className="border-l-2 border-ta-orange-300 bg-ta-grey-450 px-3 py-2">
+        <div key={call.id} className="border-l-2 border-ta-orange-300 bg-ta-grey-450 px-4 py-3">
           <p className="type-accent-s text-ta-orange-75">{call.function.name}</p>
           <Mono>{prettyArgs(call.function.arguments)}</Mono>
         </div>
@@ -122,7 +122,7 @@ function MessageDefinition({ message }: { message: RawMessage }) {
 
 function Mono({ children }: { children: string }) {
   return (
-    <pre className="type-body-s overflow-x-auto whitespace-pre-wrap font-(family-name:--font-dm-mono) text-ta-grey-100">
+    <pre className="type-body-s overflow-x-auto whitespace-pre-wrap font-(family-name:--font-dm-mono) leading-relaxed text-ta-grey-100">
       {children}
     </pre>
   );
