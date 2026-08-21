@@ -1,5 +1,6 @@
 import type { NormalizedTrace } from "@core/types";
 import { formatCost, formatSeconds, formatTokens } from "@core/format";
+import { Hint } from "@/components/ui/hint";
 
 export function Header({ trace }: { trace: NormalizedTrace }) {
   return (
@@ -8,18 +9,18 @@ export function Header({ trace }: { trace: NormalizedTrace }) {
       <span className="type-body-m text-ta-sand-50">{trace.name}</span>
       <span className="type-accent-s text-ta-grey-200">{trace.models.join(", ")}</span>
       <div className="type-accent-s ml-auto flex gap-6 text-ta-grey-100">
-        <Stat label="generations" value={String(trace.generations.length)} />
-        <Stat label="segments" value={String(trace.segmentCount)} />
+        <Stat label={<Hint term="generation">generations</Hint>} value={String(trace.generations.length)} />
+        <Stat label={<Hint term="segment">segments</Hint>} value={String(trace.segmentCount)} />
         <Stat label="in" value={formatTokens(trace.totalTokens.input)} />
         <Stat label="out" value={formatTokens(trace.totalTokens.output)} />
-        <Stat label="model time" value={formatSeconds(trace.totalLatency)} />
+        <Stat label={<Hint term="model time">model time</Hint>} value={formatSeconds(trace.totalLatency)} />
         <Stat label="cost" value={formatCost(trace.totalCost)} />
       </div>
     </header>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: React.ReactNode; value: string }) {
   return (
     <span>
       <span className="text-ta-grey-200">{label} </span>

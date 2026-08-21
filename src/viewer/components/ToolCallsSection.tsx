@@ -1,6 +1,7 @@
 import type { NormalizedTrace } from "@core/types";
 import { allToolCalls } from "@core/normalize";
 import { formatCompact, formatMs } from "@core/format";
+import { Section } from "@/components/ui/section";
 import { cn } from "@/lib/utils";
 
 interface ToolCallsSectionProps {
@@ -34,11 +35,7 @@ export function ToolCallsSection({ trace, selectedIndex, onSelect }: ToolCallsSe
   const grid = { display: "grid", gridTemplateColumns: columns, columnGap: "1rem" } as const;
 
   return (
-    <section className="border-b border-ta-grey-400">
-      <div className="flex items-baseline gap-4 px-6 py-3">
-        <h2 className="type-accent-m text-ta-sand-50">tool calls</h2>
-        <span className="type-accent-s text-ta-grey-200">{rows.length} calls</span>
-      </div>
+    <Section title="tool calls" meta={`${rows.length} calls`}>
       <div className="type-accent-s max-h-80 overflow-x-auto overflow-y-auto px-6 pb-4" role="table">
         <div style={grid} className="border-b border-ta-grey-400 pb-1 text-ta-grey-200" role="row">
           <span role="columnheader">gen</span>
@@ -104,7 +101,7 @@ export function ToolCallsSection({ trace, selectedIndex, onSelect }: ToolCallsSe
           );
         })}
       </div>
-    </section>
+    </Section>
   );
 }
 

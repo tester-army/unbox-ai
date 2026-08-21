@@ -3,6 +3,8 @@ import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import type { NormalizedTrace } from "@core/types";
 import { formatPercent, formatSeconds, formatTokens } from "@core/format";
 import { CHART_COLORS, ChartContainer, ChartLegend, ChartTooltip } from "@/components/ui/chart";
+import { Hint } from "@/components/ui/hint";
+import { Section } from "@/components/ui/section";
 import { computeInsights } from "@/lib/insights";
 
 const TICK = { fill: "var(--ta-grey-200)", fontSize: 11, fontFamily: "var(--font-dm-mono)" };
@@ -18,18 +20,27 @@ export function InsightsSection({ trace, onSelect }: InsightsSectionProps) {
   const insights = useMemo(() => computeInsights(trace), [trace]);
 
   return (
-    <section className="border-b border-ta-grey-400">
-      <div className="flex items-baseline gap-4 px-6 py-3">
-        <h2 className="type-accent-m text-ta-sand-50">insights</h2>
-        <span className="type-accent-s text-ta-grey-200">
-          {insights.promptWaitShare !== null &&
-            `prompt wait is ${formatPercent(insights.promptWaitShare, 1)} of latency · `}
-          {formatPercent(insights.cachedShare, 1)} of input is repeated prefix
-          {insights.prefixRepaid > 0 &&
-            ` · ~${formatTokens(insights.prefixRepaid)} re-paid at fresh conversation starts`}
-        </span>
-      </div>
-
+    <Section
+      title="insights"
+      meta={
+        <>
+          {insights.promptWaitShare !== null && (
+            <>
+              <Hint term="prompt wait">prompt wait</Hint>{" "}
+              {formatPercent(insights.promptWaitShare, 1)} ·{" "}
+            </>
+          )}
+          <Hint term="repeated prefix">repeated prefix</Hint>{" "}
+          {formatPercent(insights.cachedShare, 1)}
+          {insights.prefixRepaid > 0 && (
+            <>
+              {" · "}
+              <Hint term="re-paid prefix">re-paid</Hint> ~{formatTokens(insights.prefixRepaid)}
+            </>
+          )}
+        </>
+      }
+    >
       <div className="grid gap-6 px-6 pb-5 lg:grid-cols-2">
         <div>
           <p className="type-accent-s mb-2 text-ta-grey-200">
@@ -98,6 +109,6 @@ export function InsightsSection({ trace, onSelect }: InsightsSectionProps) {
           </ChartContainer>
         </div>
       </div>
-    </section>
+    </Section>
   );
 }

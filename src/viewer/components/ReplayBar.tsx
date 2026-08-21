@@ -1,6 +1,8 @@
 import type { NormalizedTrace } from "@core/types";
 import { formatPercent, formatSeconds } from "@core/format";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
+import { Section } from "@/components/ui/section";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SPEEDS, type Replay } from "@/lib/use-replay";
 import { cn } from "@/lib/utils";
@@ -21,26 +23,30 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
   const { total, starts } = replay;
 
   return (
-    <section className="border-b border-ta-grey-400">
-      <div className="flex items-center gap-4 px-6 py-3">
-        <h2 className="type-accent-m text-ta-sand-50">time</h2>
-        <Button onClick={replay.toggle}>{replay.playing ? "pause" : "play"}</Button>
-        <Tabs value={String(replay.speed)} onValueChange={(v) => replay.setSpeed(Number(v))}>
-          <TabsList>
-            {SPEEDS.map((speed) => (
-              <TabsTrigger key={speed} value={String(speed)}>
-                {speed}x
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <span className="type-accent-s text-ta-grey-100">
-          {formatSeconds(replay.elapsed)} / {formatSeconds(total)} model time
-        </span>
-        <span className="type-accent-s ml-auto text-ta-grey-200">
-          dark = ttft · strip: grey = repeated prefix, orange = fresh
-        </span>
-      </div>
+    <Section
+      title="time"
+      hint="time chart"
+      meta={
+        <>
+          {formatSeconds(replay.elapsed)} / {formatSeconds(total)}{" "}
+          <Hint term="model time">model time</Hint>
+        </>
+      }
+      actions={
+        <>
+          <Button onClick={replay.toggle}>{replay.playing ? "pause" : "play"}</Button>
+          <Tabs value={String(replay.speed)} onValueChange={(v) => replay.setSpeed(Number(v))}>
+            <TabsList>
+              {SPEEDS.map((speed) => (
+                <TabsTrigger key={speed} value={String(speed)}>
+                  {speed}x
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </>
+      }
+    >
       <div className="px-6 pb-4">
         {total <= 0 ? (
           <p className="type-accent-s border border-ta-grey-400 px-3 py-2 text-ta-grey-200">
@@ -102,6 +108,6 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
           </div>
         )}
       </div>
-    </section>
+    </Section>
   );
 }

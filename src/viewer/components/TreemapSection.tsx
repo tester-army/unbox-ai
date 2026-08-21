@@ -3,6 +3,8 @@ import type { Generation, NormalizedTrace } from "@core/types";
 import { formatPercent, formatTokens } from "@core/format";
 import { DefinitionDialog } from "@/components/DefinitionDialog";
 import { Treemap } from "@/components/Treemap";
+import { Hint } from "@/components/ui/hint";
+import { Section } from "@/components/ui/section";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildTreemapData,
@@ -33,24 +35,28 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
   const inspected = leaves.find((leaf) => leaf.id === inspectedId) ?? pinned;
 
   return (
-    <section className="border-b border-ta-grey-400">
-      <div className="flex items-center gap-4 px-6 py-3">
-        <h2 className="type-accent-m text-ta-sand-50">context</h2>
-        <p className="type-accent-s text-ta-grey-200">
-          {scope === "generation" ? (
-            <>
-              generation {generation.index} input · est ·{" "}
-              <span className="text-ta-orange-75">
-                {formatTokens(generation.metrics.inputTokens - generation.breakdown.cacheableTokens)}{" "}
-                fresh (bright)
-              </span>{" "}
-              · {formatTokens(generation.breakdown.cacheableTokens)} repeated prefix (faint)
-            </>
-          ) : (
-            "all generations · est"
-          )}
-        </p>
-        <div className="ml-auto flex gap-2">
+    <Section
+      title="context"
+      hint="context treemap"
+      meta={
+        scope === "generation" ? (
+          <>
+            gen {generation.index} ·{" "}
+            <span className="text-ta-orange-75">
+              {formatTokens(generation.metrics.inputTokens - generation.breakdown.cacheableTokens)}
+            </span>{" "}
+            <Hint term="fresh input">fresh</Hint> ·{" "}
+            {formatTokens(generation.breakdown.cacheableTokens)}{" "}
+            <Hint term="repeated prefix">repeated prefix</Hint> · <Hint term="est">est</Hint>
+          </>
+        ) : (
+          <>
+            all generations · <Hint term="est">est</Hint>
+          </>
+        )
+      }
+      actions={
+        <>
           <Tabs value={scope} onValueChange={setScope}>
             <TabsList>
               <TabsTrigger value="generation">generation</TabsTrigger>
@@ -63,8 +69,9 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
               <TabsTrigger value="cost">cost</TabsTrigger>
             </TabsList>
           </Tabs>
-        </div>
-      </div>
+        </>
+      }
+    >
       <div className="px-6 pb-3">
         <Treemap
           groups={groups}
@@ -91,6 +98,6 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
         </div>
         {pinned && <DefinitionDialog leaf={pinned} onClose={() => setPinnedId(null)} />}
       </div>
-    </section>
+    </Section>
   );
 }
