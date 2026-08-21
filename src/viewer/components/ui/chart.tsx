@@ -1,22 +1,25 @@
 import type { ReactNode } from "react";
 import { ResponsiveContainer, type TooltipContentProps } from "recharts";
+import { cn } from "@/lib/utils";
 
 /** Series colors from the design system: grey = repeated/waiting, orange = fresh/active. */
 export const CHART_COLORS = {
   muted: "var(--ta-grey-300)",
   accent: "var(--ta-orange-300)",
+  unattributed: "var(--ta-grey-400)",
 } as const;
 
 interface ChartContainerProps {
   height: number;
+  className?: string;
   children: React.ReactElement;
 }
 
 /** shadcn-style chart shell: DS surface, mono ticks, fixed height. */
-export function ChartContainer({ height, children }: ChartContainerProps) {
+export function ChartContainer({ height, className, children }: ChartContainerProps) {
   return (
     <div
-      className="border border-ta-grey-400 bg-ta-grey-450 p-2 [&_svg]:overflow-visible"
+      className={cn("border border-ta-grey-400 bg-ta-grey-450 p-2 [&_svg]:overflow-visible", className)}
       style={{ height }}
     >
       <ResponsiveContainer width="100%" height="100%">

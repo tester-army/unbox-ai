@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import type { NormalizedTrace } from "@core/types";
 import { formatPercent, formatSeconds, formatTokens } from "@core/format";
+import { computeInsights } from "@core/insights";
 import { CHART_COLORS, ChartContainer, ChartLegend, ChartTooltip } from "@/components/ui/chart";
 import { Hint } from "@/components/ui/hint";
 import { Section } from "@/components/ui/section";
-import { computeInsights } from "@/lib/insights";
 
 const TICK = { fill: "var(--ta-grey-200)", fontSize: 11, fontFamily: "var(--font-dm-mono)" };
 const GRID = "var(--ta-grey-400)";
@@ -31,7 +31,7 @@ export function InsightsSection({ trace, onSelect }: InsightsSectionProps) {
             </>
           )}
           <Hint term="repeated prefix">repeated prefix</Hint>{" "}
-          {formatPercent(insights.cachedShare, 1)}
+          {formatPercent(insights.cachedTokens, insights.inputTokens)}
           {insights.prefixRepaid > 0 && (
             <>
               {" · "}
@@ -52,7 +52,7 @@ export function InsightsSection({ trace, onSelect }: InsightsSectionProps) {
               { color: CHART_COLORS.accent, label: "fresh input" },
             ]}
           />
-          <ChartContainer height={220}>
+          <ChartContainer height={220} className="cursor-pointer">
             <BarChart
               data={insights.perGeneration}
               margin={{ top: 4, right: 4, bottom: 0, left: -12 }}
@@ -68,8 +68,8 @@ export function InsightsSection({ trace, onSelect }: InsightsSectionProps) {
                 cursor={{ fill: "var(--ta-grey-400)", opacity: 0.3 }}
                 content={<ChartTooltip format={(v: number) => `${formatTokens(v)} tok`} />}
               />
-              <Bar dataKey="cached" name="repeated prefix" stackId="in" fill={CHART_COLORS.muted} className="cursor-pointer" />
-              <Bar dataKey="fresh" name="fresh input" stackId="in" fill={CHART_COLORS.accent} className="cursor-pointer" />
+              <Bar dataKey="cached" name="repeated prefix" stackId="in" fill={CHART_COLORS.muted} />
+              <Bar dataKey="fresh" name="fresh input" stackId="in" fill={CHART_COLORS.accent} />
             </BarChart>
           </ChartContainer>
         </div>
@@ -80,6 +80,7 @@ export function InsightsSection({ trace, onSelect }: InsightsSectionProps) {
             items={[
               { color: CHART_COLORS.muted, label: "prompt wait (ttft)" },
               { color: CHART_COLORS.accent, label: "generation" },
+              { color: CHART_COLORS.unattributed, label: "no ttft reported" },
             ]}
           />
           <ChartContainer height={220}>
@@ -105,6 +106,7 @@ export function InsightsSection({ trace, onSelect }: InsightsSectionProps) {
               />
               <Bar dataKey="promptWait" name="prompt wait" stackId="t" fill={CHART_COLORS.muted} />
               <Bar dataKey="generation" name="generation" stackId="t" fill={CHART_COLORS.accent} />
+              <Bar dataKey="unattributed" name="no ttft reported" stackId="t" fill={CHART_COLORS.unattributed} />
             </BarChart>
           </ChartContainer>
         </div>

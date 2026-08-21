@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { NormalizedTrace } from "@core/types";
 import { GenerationDetail } from "@/components/GenerationDetail";
 import { Header } from "@/components/Header";
-import { InsightsSection } from "@/components/InsightsSection";
+
+// recharts is the heaviest dependency; keep it out of the initial chunk
+const InsightsSection = lazy(() =>
+  import("@/components/InsightsSection").then((m) => ({ default: m.InsightsSection })),
+);
 import { ReplayBar } from "@/components/ReplayBar";
 import { ToolCallsSection } from "@/components/ToolCallsSection";
 import { TreemapSection } from "@/components/TreemapSection";
@@ -86,7 +90,9 @@ function Loaded({ trace, selectedIndex, onSelect }: LoadedProps) {
             selectedIndex={selected.index}
             onSelect={selectGeneration}
           />
-          <InsightsSection trace={trace} onSelect={selectGeneration} />
+          <Suspense fallback={null}>
+            <InsightsSection trace={trace} onSelect={selectGeneration} />
+          </Suspense>
           <GenerationDetail key={selected.index} generation={selected} />
         </main>
       </div>

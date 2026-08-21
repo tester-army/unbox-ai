@@ -1,15 +1,13 @@
 import { formatPercent } from "../../core/format";
+import { computeInsights } from "../../core/insights";
 import { toolCallNames } from "../../core/normalize";
 import type { LoadedTrace } from "../load";
 import { formatCallNames, formatCost, formatSeconds, formatTokens, printJson } from "../output";
 
-function cacheableSum(loaded: LoadedTrace): number {
-  return loaded.trace.generations.reduce((acc, g) => acc + g.breakdown.cacheableTokens, 0);
-}
-
 /** Prints trace totals plus a one-liner per generation. */
 export function summary(loaded: LoadedTrace, json: boolean): void {
   const { trace } = loaded;
+  const insights = computeInsights(trace);
   if (json) {
     printJson({
       traceId: trace.traceId,
@@ -20,7 +18,9 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
       generations: trace.generations.length,
       segments: trace.segmentCount,
       totalTokens: trace.totalTokens,
-      cacheableTokens: cacheableSum(loaded),
+      cacheableTokens: insights.cachedTokens,
+      promptWaitShare: insights.promptWaitShare,
+      prefixRepaidTokens: insights.prefixRepaid,
       totalCost: trace.totalCost,
       totalLatency: trace.totalLatency,
     });
@@ -36,9 +36,14 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
       `${formatCost(trace.totalCost)}, ${formatSeconds(trace.totalLatency)} model time`,
   );
   console.log(
-    `caching   ${formatPercent(cacheableSum(loaded), trace.totalTokens.input)} of input tokens ` +
+    `caching   ${formatPercent(insights.cachedTokens, insights.inputTokens)} of input tokens ` +
       `were cached prefix (reported cache reads when available, else estimated from repeats)`,
   );
+  if (insights.promptWaitShare !== null) {
+    console.log(
+      `latency   ${formatPercent(insights.promptWaitShare, 1)} of model time is prompt wait (ttft)`,
+    );
+  }
   console.log("");
   for (const gen of trace.generations) {
     const calls = formatCallNames(toolCallNames(gen));
