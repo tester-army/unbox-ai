@@ -398,6 +398,8 @@ function requestedWaitMs(name: string, args: unknown): number | undefined {
 function normalizeRole(role: string): MessageRole {
   if (role === "assistant (tool result)" || role === "tool") return "tool-result";
   if (role === "system" || role === "user" || role === "assistant") return role;
+  // e.g. "assistant (thinking)" - redacted reasoning placeholders
+  if (role.startsWith("assistant")) return "assistant";
   return "unknown";
 }
 
