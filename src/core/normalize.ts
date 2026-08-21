@@ -32,22 +32,7 @@ export function normalizeTrace(raw: RawTrace): NormalizedTrace {
     // verbatim, so its cache-eligible prefix is exactly that request's
     // reported input; compaction breaks the cache at the first rewrite,
     // falling back to an estimate of the still-identical leading run
-    const continues = pos.prevIndex !== null && pos.carried > 0;
-    // clamp: provider token reporting is not monotonic, so the predecessor's
-    // input can exceed this request's despite a byte-identical prefix
-    const cacheable: CacheableSpec = {
-      uptoMessage: continues ? pos.firstMutation : 0,
-      toolsCached: continues,
-      ...(continues && pos.firstMutation >= pos.carried
-        ? {
-            exactTokens: Math.min(
-              raw.events[pos.prevIndex!]!.metrics.tokens.input,
-              event.metrics.tokens.input,
-            ),
-          }
-        : {}),
-    };
-    return normalizeEvent(event, index, pos, pairing, cacheable);
+    return normalizeEvent(event, index, pos, pairing, cacheableSpec(pos, raw.events, event));
   });
   const segmentCount = positions.reduce((max, p) => Math.max(max, p.segment + 1), 0);
 
@@ -194,6 +179,27 @@ interface CacheableSpec {
   uptoMessage: number;
   /** Tool definitions are part of the resent prefix on any continuation. */
   toolsCached: boolean;
+}
+
+function cacheableSpec(pos: EventPosition, events: RawEvent[], event: RawEvent): CacheableSpec {
+  if (pos.prevIndex === null || pos.carried === 0) {
+    return { uptoMessage: 0, toolsCached: false };
+  }
+  const prev = events[pos.prevIndex]!;
+  // the predecessor's response was never in a prior request - it is fresh
+  // input here, so the cached prefix stops before it
+  const uptoMessage = Math.min(pos.firstMutation, withoutResponse(prev.messages).length);
+  const unmutated = pos.firstMutation >= pos.carried;
+  return {
+    uptoMessage,
+    toolsCached: true,
+    ...(unmutated
+      ? {
+          // provider token reporting is not monotonic: clamp to this request's input
+          exactTokens: Math.min(prev.metrics.tokens.input, event.metrics.tokens.input),
+        }
+      : {}),
+  };
 }
 
 function normalizeEvent(
@@ -393,15 +399,26 @@ function buildBreakdown(
     };
   });
 
-  scaleToReportedTokens([...system, ...tools, ...conversation], event.metrics.tokens.input);
+  const all = [...system, ...tools, ...conversation];
+  const cachedItems = all.filter((item) => item.cached);
+  if (cacheable.exactTokens !== undefined) {
+    // the exact split is known: scale each pool to its true total so the
+    // header numbers and the faint/bright areas agree by construction
+    scaleToReportedTokens(cachedItems, cacheable.exactTokens);
+    scaleToReportedTokens(
+      all.filter((item) => !item.cached),
+      event.metrics.tokens.input - cacheable.exactTokens,
+    );
+  } else {
+    scaleToReportedTokens(all, event.metrics.tokens.input);
+  }
 
   const groups: BreakdownGroup[] = [
     { key: "system", estTokens: sumTokens(system), items: system },
     { key: "tools", estTokens: sumTokens(tools), items: tools },
     { key: "conversation", estTokens: sumTokens(conversation), items: conversation },
   ];
-  const cachedItems = [...system, ...tools, ...conversation].filter((item) => item.cached);
-  const cacheableTokens = cacheable.exactTokens ?? sumTokens(cachedItems);
+  const cacheableTokens = sumTokens(cachedItems);
 
   return {
     inputTokens: event.metrics.tokens.input,

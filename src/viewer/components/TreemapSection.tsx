@@ -42,12 +42,10 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
             <>
               generation {generation.index} input · est ·{" "}
               <span className="text-ta-orange-75">
-                {formatTokens(
-                  Math.max(generation.metrics.inputTokens - generation.breakdown.cacheableTokens, 0),
-                )}{" "}
+                {formatTokens(generation.metrics.inputTokens - generation.breakdown.cacheableTokens)}{" "}
                 fresh (bright)
               </span>{" "}
-              · {formatTokens(generation.breakdown.cacheableTokens)} cached prefix (faint)
+              · {formatTokens(generation.breakdown.cacheableTokens)} repeated prefix (faint)
             </>
           ) : (
             "all generations · est"
@@ -82,7 +80,7 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
                 ~{formatTokens(inspected.estTokens)} tok (
                 {formatPercent(inspected.estTokens, totalTokens)})
                 {inspected.sentCount > 1 ? ` sent ${inspected.sentCount}x` : ""}
-                {inspected.cached === undefined ? "" : inspected.cached ? " · cached prefix" : " · fresh"}
+                {inspected.cached === undefined ? "" : inspected.cached ? " · repeated prefix" : " · fresh"}
               </span>
               <span className="type-body-s min-w-0 truncate normal-case text-ta-grey-200">
                 {inspected.preview || "(no text)"}

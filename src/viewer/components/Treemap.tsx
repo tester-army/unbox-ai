@@ -145,7 +145,7 @@ function LeafBlock({ node, leaf, onInspect, onOpen }: LeafBlockProps) {
       onMouseEnter={() => onInspect(leaf.id)}
       onClick={() => onOpen(leaf.id)}
       title={`${leaf.label} ~${formatTokens(leaf.estTokens)} tok${
-        leaf.cached === undefined ? "" : leaf.cached ? " (cached prefix)" : " (fresh)"
+        leaf.cached === undefined ? "" : leaf.cached ? " (repeated prefix)" : " (fresh)"
       }`}
     >
       {width > 56 && height > 26 && (

@@ -111,10 +111,12 @@ export interface TokenBreakdown {
   inputTokens: number;
   outputTokens: number;
   /**
-   * Input tokens that are an identical prefix of the previous request -
-   * exactly the previous request's reported input - and therefore
-   * cache-eligible. 0 on a segment start, which is conservative: the system
-   * prompt and tool definitions may still prefix-match across segments.
+   * Input tokens in the repeated, cache-eligible prefix: the sum of items
+   * marked cached. On an unmutated continuation the cached pool is scaled to
+   * the predecessor's reported input (clamped to this request's input); after
+   * compaction it is a char-proportional estimate up to the first rewrite.
+   * 0 on a segment start, which is conservative: system prompt and tool
+   * definitions may still prefix-match across segments.
    */
   cacheableTokens: number;
   groups: BreakdownGroup[];
