@@ -78,7 +78,7 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
           onInspect={setInspectedId}
           onOpen={(id) => setPinnedId((current) => (current === id ? null : id))}
         />
-        <div className="type-accent-s mt-2 flex min-h-10 items-start gap-4 border border-ta-grey-400 bg-ta-grey-450 px-3 py-2 text-ta-grey-100">
+        <div className="type-accent-s mt-2 flex min-h-10 items-center gap-4 border border-ta-grey-400 bg-ta-grey-450 px-3 py-2 text-ta-grey-100">
           {inspected ? (
             <>
               <span className="shrink-0 text-ta-orange-75">{inspected.label}</span>
