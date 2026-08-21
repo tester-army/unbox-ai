@@ -19,6 +19,8 @@ export function GenerationDetail({ generation }: { generation: Generation }) {
         {generation.carriedMessages > 0
           ? `${generation.carriedMessages} messages carried from previous generations - showing the ${generation.newMessages.length} new`
           : `fresh conversation (segment ${generation.segment}) - ${generation.newMessages.length} messages`}
+        {generation.foldedResults > 0 &&
+          ` (${generation.foldedResults} tool result${generation.foldedResults === 1 ? "" : "s"} shown under calls)`}
       </p>
       <div className="flex flex-col gap-2">
         {generation.newMessages.map((message) => (

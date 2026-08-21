@@ -55,7 +55,10 @@ export async function startServer(
       res.end(body);
     } catch {
       // SPA fallback for extension-less deep links only; missing assets stay a hard 404
-      const index = extname(path) === "" && (await readFile(join(dir, "index.html")).catch(() => null));
+      const index =
+        extname(path) === ""
+          ? await readFile(join(dir, "index.html")).catch(() => null)
+          : null;
       if (index) {
         res.writeHead(200, { "content-type": "text/html" }).end(index);
       } else {
@@ -85,11 +88,16 @@ async function listen(server: Server, preferredPort: number): Promise<number> {
 
 function tryListen(server: Server, port: number): Promise<void> {
   return new Promise((resolve, reject) => {
-    const onError = (error: Error) => reject(error);
-    server.once("error", onError);
-    server.listen(port, "127.0.0.1", () => {
+    const onError = (error: Error) => {
+      server.off("listening", onListening);
+      reject(error);
+    };
+    const onListening = () => {
       server.off("error", onError);
       resolve();
-    });
+    };
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen(port, "127.0.0.1");
   });
 }

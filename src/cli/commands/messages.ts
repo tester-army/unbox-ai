@@ -42,7 +42,12 @@ export function messages(loaded: LoadedTrace, filter: MessagesFilter, json: bool
   for (const hit of shown) {
     const calls = hit.toolCalls?.map((c) => c.name).join(",");
     const body = hit.text
-      ? truncate(hit.text.replace(/\s+/g, " "), contentPointer(hit.gen, hit.index), 240)
+      ? truncate(
+          hit.text.replace(/\s+/g, " "),
+          contentPointer(hit.gen, hit.index),
+          240,
+          hit.text.length,
+        )
       : `tool_calls: ${calls} - drill in: unbox-ai event <trace> ${hit.gen}`;
     console.log(
       `[gen ${hit.gen} msg ${hit.index}] ${hit.role} (~${formatTokens(hit.approxTokens)} tok): ${body}`,

@@ -1,4 +1,4 @@
-export { formatCompact, formatCost, formatSeconds, formatTokens } from "../core/format";
+export { formatCost, formatSeconds, formatTokens } from "../core/format";
 
 /** Canonical `get` pointer to a message's content. */
 export function contentPointer(genIndex: number, messageIndex: number): string {
@@ -15,10 +15,17 @@ const MAX_FIELD_CHARS = 1500;
 
 /**
  * Truncates long text, appending the exact `get` pointer to fetch the rest.
+ * Pass sourceLength when `text` was reformatted (e.g. whitespace-collapsed)
+ * so the remainder count matches what `get` actually returns.
  */
-export function truncate(text: string, pointer?: string, max = MAX_FIELD_CHARS): string {
+export function truncate(
+  text: string,
+  pointer?: string,
+  max = MAX_FIELD_CHARS,
+  sourceLength = text.length,
+): string {
   if (text.length <= max) return text;
-  const rest = text.length - max;
+  const rest = Math.max(sourceLength - max, 1);
   const hint = pointer ? ` - run: unbox-ai get <trace> '${pointer}'` : "";
   return `${text.slice(0, max)}\n[... ${rest} more chars${hint}]`;
 }

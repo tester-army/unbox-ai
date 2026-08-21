@@ -73,6 +73,8 @@ export interface Generation {
   toolCount: number;
   /** Count of context messages carried over from previous generations. */
   carriedMessages: number;
+  /** Tool results folded into their calls instead of shown as messages. */
+  foldedResults: number;
   /** Messages new in this generation vs the previous one (tool results folded into their calls). */
   newMessages: Message[];
   /** Input-token attribution for the treemap. */

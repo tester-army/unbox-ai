@@ -30,10 +30,14 @@ export function event(loaded: LoadedTrace, index: number, json: boolean): void {
     .map((g) => `${g.key} ~${formatTokens(g.estTokens)}`)
     .join(", ");
   console.log(`input split (est): ${byGroup}  |  ${gen.toolCount} tools available`);
+  const folded =
+    gen.foldedResults > 0
+      ? ` (${gen.foldedResults} tool result${gen.foldedResults === 1 ? "" : "s"} shown under calls)`
+      : "";
   console.log(
     gen.carriedMessages > 0
-      ? `context: ${gen.carriedMessages} carried messages + ${gen.newMessages.length} new`
-      : `context: fresh conversation, ${gen.newMessages.length} messages`,
+      ? `context: ${gen.carriedMessages} carried messages + ${gen.newMessages.length} new${folded}`
+      : `context: fresh conversation, ${gen.newMessages.length} messages${folded}`,
   );
   console.log("");
   gen.newMessages.forEach((message) => printMessage(message, gen.index));

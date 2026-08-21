@@ -21,16 +21,17 @@ Usage:
   unbox-ai get <trace.json> <path>       raw value at a path, e.g. events[3].messages[2].content
 
 Options:
-  --json          machine-readable output (summary, events, event, messages)
+  --json          machine-readable output, unbounded (summary, events, event, messages)
   --port <n>      server port for view (default 4177)
   --no-open       start the server without opening a browser
-  --role <r>      filter: system | user | assistant | tool-result
+  --role <r>      filter: system | user | assistant | tool-result | unknown
   --event <n>     filter: only messages of generation n
   --grep <re>     filter: case-insensitive regex over content and tool calls
   --limit <n>     max messages printed (default 30)
 
-All read commands print bounded output; truncations include the exact
-"get" invocation that returns the rest. Safe for agents to run freely.`;
+Plain output is bounded; truncations include the exact "get" invocation
+that returns the rest. --json is complete and therefore unbounded.
+All commands are read-only - safe for agents to run freely.`;
 
 const COMMANDS = new Set(["view", "summary", "events", "event", "messages", "get"]);
 

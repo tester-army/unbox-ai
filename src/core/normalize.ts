@@ -22,19 +22,14 @@ const CHARS_PER_TOKEN = 4;
  */
 export function normalizeTrace(raw: RawTrace): NormalizedTrace {
   assertTraceShape(raw);
-  // Pair trace-wide: a call made in generation N gets its result from N+1's snapshot
-  const pairing = collectPairing(raw.events);
-  const generations: Generation[] = [];
-  let segment = 0;
-  let prev: RawEvent | undefined;
-
-  raw.events.forEach((event, index) => {
-    const continuesPrev = prev !== undefined && isPrefix(prev.messages, event.messages);
-    if (prev !== undefined && !continuesPrev) segment += 1;
-    const carried = continuesPrev && prev !== undefined ? prev.messages.length : 0;
-    generations.push(normalizeEvent(event, index, segment, carried, pairing));
-    prev = event;
-  });
+  const positions = assignSegments(raw.events);
+  // Pair per segment: a call made in generation N gets its result from N+1's
+  // snapshot, and a segment reset may legitimately reuse tool call ids
+  const pairing = collectPairing(raw.events, positions);
+  const generations = raw.events.map((event, index) =>
+    normalizeEvent(event, index, positions[index]!, pairing),
+  );
+  const segment = positions.at(-1)?.segment ?? 0;
 
   return {
     traceId: raw.trace_id,
@@ -59,10 +54,39 @@ export function assertTraceShape(raw: unknown): asserts raw is RawTrace {
     if (!Array.isArray(event?.messages)) {
       throw new Error(`Unsupported trace: events[${i}] has no messages[] array`);
     }
-    if (typeof event.metrics?.tokens?.input !== "number") {
-      throw new Error(`Unsupported trace: events[${i}] has no metrics.tokens`);
+    const m = event.metrics;
+    if (
+      typeof m?.tokens?.input !== "number" ||
+      typeof m.tokens.output !== "number" ||
+      typeof m.latency !== "number" ||
+      typeof m.time_to_first_token !== "number" ||
+      typeof m.cost !== "number"
+    ) {
+      throw new Error(
+        `Unsupported trace: events[${i}] is missing metrics (latency, time_to_first_token, tokens, cost)`,
+      );
     }
   }
+}
+
+interface EventPosition {
+  segment: number;
+  /** Count of context messages carried over from the previous generation. */
+  carried: number;
+}
+
+/** Splits events into conversation segments and computes each event's carried prefix. */
+function assignSegments(events: RawEvent[]): EventPosition[] {
+  const positions: EventPosition[] = [];
+  let segment = 0;
+  let prev: RawEvent | undefined;
+  for (const event of events) {
+    const continuesPrev = prev !== undefined && isPrefix(prev.messages, event.messages);
+    if (prev !== undefined && !continuesPrev) segment += 1;
+    positions.push({ segment, carried: continuesPrev && prev ? prev.messages.length : 0 });
+    prev = event;
+  }
+  return positions;
 }
 
 /** Names of the tool calls a generation's new messages make, in order. */
@@ -73,16 +97,16 @@ export function toolCallNames(gen: Generation): string[] {
 function normalizeEvent(
   event: RawEvent,
   index: number,
-  segment: number,
-  carried: number,
+  { segment, carried }: EventPosition,
   pairing: Pairing,
 ): Generation {
+  const rawNew = event.messages.length - carried;
   const newMessages = event.messages
     .slice(carried)
     .map((message, offset) => ({ raw: message, index: carried + offset }))
     // paired results render inline under their call; orphans stay visible
-    .filter(({ raw }) => !(isToolResult(raw) && pairing.callIds.has(raw.tool_call_id!)))
-    .map(({ raw, index }) => normalizeMessage(raw, index, pairing.results));
+    .filter(({ raw }) => !(isToolResult(raw) && pairing.callIds.has(`${segment}:${raw.tool_call_id}`)))
+    .map(({ raw, index }) => normalizeMessage(raw, index, segment, pairing.results));
 
   return {
     index,
@@ -99,6 +123,7 @@ function normalizeEvent(
     },
     toolCount: event.available_tools?.length ?? 0,
     carriedMessages: carried,
+    foldedResults: rawNew - newMessages.length,
     newMessages,
     breakdown: buildBreakdown(event, segment),
   };
@@ -117,24 +142,25 @@ interface ToolResult {
 }
 
 interface Pairing {
-  /** Every tool call id made anywhere in the trace. */
+  /** Every tool call id made anywhere in the trace, keyed "segment:id". */
   callIds: Set<string>;
-  /** Result of each call, keyed by call id. */
+  /** Result of each call, keyed "segment:id". */
   results: Map<string, ToolResult>;
 }
 
-function isToolResult(message: RawMessage): boolean {
+function isToolResult(message: RawMessage): message is RawMessage & { tool_call_id: string } {
   return normalizeRole(message.role) === "tool-result" && message.tool_call_id !== undefined;
 }
 
-function collectPairing(events: RawEvent[]): Pairing {
+function collectPairing(events: RawEvent[], positions: EventPosition[]): Pairing {
   const callIds = new Set<string>();
   const results = new Map<string, ToolResult>();
   events.forEach((event, eventIndex) => {
+    const segment = positions[eventIndex]!.segment;
     event.messages.forEach((message, messageIndex) => {
-      for (const call of message.tool_calls ?? []) callIds.add(call.id);
-      if (isToolResult(message) && !results.has(message.tool_call_id!)) {
-        results.set(message.tool_call_id!, {
+      for (const call of message.tool_calls ?? []) callIds.add(`${segment}:${call.id}`);
+      if (isToolResult(message) && !results.has(`${segment}:${message.tool_call_id}`)) {
+        results.set(`${segment}:${message.tool_call_id}`, {
           text: contentToText(message.content),
           ref: { event: eventIndex, message: messageIndex },
         });
@@ -147,11 +173,12 @@ function collectPairing(events: RawEvent[]): Pairing {
 function normalizeMessage(
   raw: RawMessage,
   index: number,
+  segment: number,
   results: Map<string, ToolResult>,
 ): Message {
   const text = contentToText(raw.content);
   const toolCalls = raw.tool_calls?.map((call): PairedToolCall => {
-    const result = results.get(call.id);
+    const result = results.get(`${segment}:${call.id}`);
     return {
       id: call.id,
       name: call.function.name,
