@@ -409,12 +409,33 @@ export function contentToText(content: unknown): string {
       .map((part) => {
         if (typeof part === "string") return part;
         if (typeof part?.text === "string") return part.text;
+        const attachment = attachmentLabel(part);
+        if (attachment !== undefined) return attachment;
         return JSON.stringify(part);
       })
       .join("\n");
   }
   if (content == null) return "";
   return JSON.stringify(content);
+}
+
+/**
+ * Exporters replace binary attachments (screenshots etc.) with stub parts
+ * like {"type":"file","mediaType":"image/jpeg","file":"raw files not
+ * supported"} - label them instead of dumping the stub JSON. The real bytes
+ * (and their token cost) are not in the trace.
+ */
+function attachmentLabel(part: {
+  type?: unknown;
+  mediaType?: unknown;
+  file?: unknown;
+  image?: unknown;
+}): string | undefined {
+  if (part?.type !== "file" && part?.type !== "image") return undefined;
+  const media = typeof part.mediaType === "string" ? part.mediaType : "unknown type";
+  const stub =
+    typeof part.file === "string" && part.file.length < 100 ? ` (${part.file})` : "";
+  return `[attachment: ${media}${stub} - bytes not included in the trace export]`;
 }
 
 function messageChars(message: RawMessage): number {
