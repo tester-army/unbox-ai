@@ -13,7 +13,8 @@ function devTraceApi(): Plugin {
   return {
     name: "unbox-dev-trace-api",
     async configureServer(server) {
-      const { normalizeTrace, parseTrace } = await import("./src/core/normalize");
+      const { normalizeTrace } = await import("./src/core/normalize");
+      const { parseTrace } = await import("./src/core/adapters");
       const { resolvePath } = await import("./src/core/path");
       server.middlewares.use("/api/raw", (req, res) => {
         try {

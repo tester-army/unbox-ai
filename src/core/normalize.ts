@@ -1,4 +1,3 @@
-import { adaptOpencodeTrace, isOpencodeTrace } from "./adapters/opencode";
 import type {
   BreakdownGroup,
   BreakdownItem,
@@ -21,16 +20,6 @@ const CHARS_PER_TOKEN = 4;
  * snapshots, pairs tool results with their calls, and attributes input
  * tokens to system prompt / tools / conversation for the treemap.
  */
-/**
- * Parses any supported trace JSON into the internal raw shape: gateway
- * exports pass through, other formats go through their adapter.
- */
-export function parseTrace(json: unknown): RawTrace {
-  if (isOpencodeTrace(json)) return adaptOpencodeTrace(json);
-  assertTraceShape(json);
-  return json;
-}
-
 export function normalizeTrace(raw: RawTrace): NormalizedTrace {
   assertTraceShape(raw);
   const positions = assignSegments(raw.events);

@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
-import { normalizeTrace, parseTrace } from "../core/normalize";
+import { resolveAdapter } from "../core/adapters";
+import { normalizeTrace } from "../core/normalize";
 import type { NormalizedTrace, RawTrace } from "../core/types";
 
 export interface LoadedTrace {
   path: string;
+  /** Which adapter recognized the file, e.g. "gateway" or "opencode". */
+  format: string;
   raw: RawTrace;
   trace: NormalizedTrace;
 }
@@ -25,8 +28,9 @@ export function loadTrace(path: string): LoadedTrace {
   try {
     // adapters (e.g. opencode) synthesize the internal raw shape; `get`
     // pointers resolve against that adapted form
-    const raw: RawTrace = parseTrace(json);
-    return { path, raw, trace: normalizeTrace(raw) };
+    const adapter = resolveAdapter(json);
+    const raw = adapter.adapt(json);
+    return { path, format: adapter.name, raw, trace: normalizeTrace(raw) };
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
   }

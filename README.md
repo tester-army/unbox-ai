@@ -72,8 +72,10 @@ pointers to fetch full values.
 
 There is no universal AI-trace standard yet; the closest are the OpenTelemetry
 GenAI semantic conventions, OpenInference, and OpenLLMetry (all span-based).
-Adapters for those are welcome contributions - see
-`src/core/adapters/opencode.ts` for the pattern.
+Adapters for those are welcome contributions: implement `TraceAdapter`
+(detect + adapt) in `src/core/adapters/<name>.ts` and register it in
+`src/core/adapters/index.ts` - `src/core/adapters/opencode.ts` is the
+reference. `unbox-ai summary` prints which format was detected.
 
 ## Development
 

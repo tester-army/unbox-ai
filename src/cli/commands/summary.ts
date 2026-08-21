@@ -13,6 +13,7 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
   if (json) {
     printJson({
       traceId: trace.traceId,
+      format: loaded.format,
       name: trace.name,
       timestamp: trace.timestamp,
       models: trace.models,
@@ -26,6 +27,7 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
     return;
   }
   console.log(`${trace.name}  (trace ${trace.traceId})`);
+  console.log(`format    ${loaded.format}`);
   console.log(`started   ${trace.timestamp}`);
   console.log(`models    ${trace.models.join(", ")}`);
   console.log(

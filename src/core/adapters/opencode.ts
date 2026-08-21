@@ -1,4 +1,5 @@
 import type { RawEvent, RawMessage, RawTrace } from "../types";
+import type { TraceAdapter } from "./index";
 
 /**
  * Adapter for opencode session exports ({info, messages[{info, parts}]}).
@@ -6,6 +7,11 @@ import type { RawEvent, RawMessage, RawTrace } from "../types";
  * one event per step-finish, each with the conversation so far. Real cache
  * read/write tokens and per-tool durations carry over.
  */
+export const opencodeAdapter: TraceAdapter = {
+  name: "opencode",
+  detect: isOpencodeTrace,
+  adapt: (json) => adaptOpencodeTrace(json as OpencodeExport),
+};
 
 interface OpencodeExport {
   info: {
@@ -53,7 +59,7 @@ interface OpencodePart {
   cost?: number;
 }
 
-export function isOpencodeTrace(raw: unknown): raw is OpencodeExport {
+function isOpencodeTrace(raw: unknown): raw is OpencodeExport {
   const t = raw as Partial<OpencodeExport>;
   return (
     typeof t === "object" &&
@@ -63,7 +69,7 @@ export function isOpencodeTrace(raw: unknown): raw is OpencodeExport {
   );
 }
 
-export function adaptOpencodeTrace(oc: OpencodeExport): RawTrace {
+function adaptOpencodeTrace(oc: OpencodeExport): RawTrace {
   const conversation: RawMessage[] = [];
   const events: RawEvent[] = [];
 
