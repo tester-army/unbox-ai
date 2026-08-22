@@ -1,19 +1,65 @@
-# unbox-ai
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/7fb2acb1-373a-44dd-9c32-b812f89f81a2" alt="unbox-ai" />
+</p>
 
-Unbox AI traces. One command opens a local visualization of an agent run:
-a bundle-analyzer-style treemap of where your input tokens go, a latency
-waterfall, and a deduplicated conversation view.
+<p align="center">
+  <a href="#quickstart"><strong>Quickstart</strong></a> |
+  <a href="#the-viewer"><strong>Viewer</strong></a> |
+  <a href="#for-agents"><strong>For Agents</strong></a> |
+  <a href="#skill-installation"><strong>Skills</strong></a> |
+  <a href="#trace-formats"><strong>Trace Formats</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/unbox-ai"><img src="https://img.shields.io/npm/v/unbox-ai?logo=npm&color=cb3837" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/unbox-ai"><img src="https://img.shields.io/npm/dm/unbox-ai?logo=npm" alt="npm downloads" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
+</p>
+
+## See where your agent's tokens actually go.
+
+unbox-ai turns an AI agent trace into something you can read. One command opens
+a local visualization of the run; the same binary doubles as a bounded,
+read-only trace explorer for coding agents.
+
+- Bundle-analyzer-style treemap of input tokens: system prompt, each tool
+  definition, each message.
+- Latency waterfall with TTFT, tokens, and cost per generation.
+- Deduplicated conversation view: only what is new in each generation.
+- Agent-safe CLI: capped output, `--json`, no accidental servers.
 
 ```bash
 npx unbox-ai trace.json
 ```
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/94773c30-8c8e-495b-9c6c-4c6c521c5051" alt="unbox-ai viewer" />
+</p>
+
 ## Why
 
-Agent traces are unreadable raw: every generation resends the full context, so
-a 16-generation trace holds hundreds of duplicated messages. In a typical run,
-~90% of input tokens are the system prompt and tool definitions, paid again on
-every request. unbox-ai makes that visible:
+Agent traces are unreadable raw. Every generation resends the full context, so
+a 16-generation trace holds hundreds of duplicated messages, and in a typical
+run ~90% of input tokens are the system prompt and tool definitions, paid again
+on every request. unbox-ai makes that visible.
+
+## Quickstart
+
+```bash
+npx unbox-ai trace.json
+```
+
+That's it. A local server starts and your browser opens the viewer. Works with
+gateway exports and opencode session exports (see
+[Trace Formats](#trace-formats)).
+
+```
+--json        machine-readable output
+--port <n>    server port (default 4177)
+--no-open     start the server without opening a browser
+```
+
+## The Viewer
 
 - **Context treemap** - input tokens attributed to system prompt, each tool
   definition, and each conversation message. Toggle per-generation vs
@@ -25,7 +71,7 @@ every request. unbox-ai makes that visible:
 Token attribution is estimated (character-proportional, scaled to the reported
 per-generation totals) and labeled as such.
 
-## For agents
+## For Agents
 
 The same binary is a bounded, read-only trace explorer - safe to allowlist:
 
@@ -40,12 +86,14 @@ unbox-ai get trace.json 'events[5].messages[10].tool_calls[0]'
 
 Every command caps its output; truncations print the exact `get` invocation
 that returns the rest. `--json` gives machine-readable output. When stdout is
-not a TTY, bare `unbox-ai trace.json` prints the summary instead of starting
-a server, so agents never spawn one by accident.
+not a TTY, bare `unbox-ai trace.json` prints the summary instead of starting a
+server, so agents never spawn one by accident.
 
-An agent skill ships in [`skills/unbox-ai/`](skills/unbox-ai/SKILL.md) with
-the full workflow and analysis recipes. Install it into your agent
-(Claude Code and friends) via the [skills](https://skills.sh) CLI:
+## Skill Installation
+
+An agent skill ships in [`skills/unbox-ai/`](skills/unbox-ai/SKILL.md) with the
+full workflow and analysis recipes. Install it into your agent (Claude Code and
+friends) via the [skills](https://skills.sh) CLI:
 
 ```bash
 npx skills add tester-army/unbox-ai -g
@@ -62,21 +110,13 @@ To inspect AI trace files, use `npx unbox-ai` (read-only, bounded output):
 pointers to fetch full values.
 ```
 
-## Options
+## Trace Formats
 
-```
---json        machine-readable output
---port <n>    server port (default 4177)
---no-open     start the server without opening a browser
-```
-
-## Trace formats
-
-- **Gateway exports**: a JSON object with `events[]` of `generation` entries
+- **Gateway exports** - a JSON object with `events[]` of `generation` entries
   carrying `model`, `metrics` (latency, tokens, cost), `available_tools`, and
   cumulative `messages` snapshots. Conversation resets and multi-agent
   interleaving are detected and shown as segments.
-- **opencode session exports** (`{info, messages[{info, parts}]}`): adapted
+- **opencode session exports** (`{info, messages[{info, parts}]}`) - adapted
   automatically. Real cache read/write tokens and per-tool execution times
   carry over. Note: opencode exports omit the system prompt and tool
   definitions, so token attribution assigns their weight to the conversation.
@@ -88,7 +128,9 @@ Adapters for those are welcome contributions: implement `TraceAdapter`
 `src/core/adapters/index.ts` - `src/core/adapters/opencode.ts` is the
 reference. `unbox-ai summary` prints which format was detected.
 
-## Development
+## Contributing
+
+PRs welcome, especially trace-format adapters. To develop locally:
 
 ```bash
 npm install
