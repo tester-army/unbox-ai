@@ -142,3 +142,9 @@ node dist/cli/index.js summary path/to/trace.json
 ## License
 
 MIT
+
+---
+
+<p align="center">
+  Built with ❤️ by <a href="https://tester.army"><strong>TesterArmy</strong></a>
+</p>
