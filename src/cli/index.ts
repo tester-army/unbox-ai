@@ -1,13 +1,13 @@
-import { parseArgs } from "node:util";
 import { resolve } from "node:path";
+import { parseArgs } from "node:util";
 import type { MessageRole } from "../core/types";
 import { event } from "./commands/event";
 import { events } from "./commands/events";
 import { get } from "./commands/get";
 import { messages } from "./commands/messages";
+import { runs } from "./commands/runs";
 import { summary } from "./commands/summary";
 import { tools } from "./commands/tools";
-import { runs } from "./commands/runs";
 import { createLiveSource } from "./live";
 import { fail, loadCollectionFiles, loadRun, loadTrace } from "./load";
 import { openBrowser } from "./open-browser";
@@ -42,7 +42,16 @@ Plain output is bounded; truncations include the exact "get" invocation
 that returns the rest. --json is complete and therefore unbounded.
 All commands are read-only - safe for agents to run freely.`;
 
-const COMMANDS = new Set(["view", "runs", "summary", "events", "event", "tools", "messages", "get"]);
+const COMMANDS = new Set([
+  "view",
+  "runs",
+  "summary",
+  "events",
+  "event",
+  "tools",
+  "messages",
+  "get",
+]);
 
 const ROLES: MessageRole[] = ["system", "user", "assistant", "tool-result", "unknown"];
 
@@ -75,9 +84,7 @@ function main(): void {
 
   const [first, ...rest] = positionals;
   if (first === "devtools") {
-    devtools(values).catch((error) =>
-      fail(error instanceof Error ? error.message : String(error)),
-    );
+    devtools(values).catch((error) => fail(error instanceof Error ? error.message : String(error)));
     return;
   }
   const command = COMMANDS.has(first!) ? first! : defaultCommand();
@@ -136,10 +143,7 @@ function defaultCommand(): string {
   return process.stdout.isTTY ? "view" : "summary";
 }
 
-async function view(
-  paths: string[],
-  values: { port?: string; "no-open": boolean },
-): Promise<void> {
+async function view(paths: string[], values: { port?: string; "no-open": boolean }): Promise<void> {
   const items = loadCollectionFiles(paths);
   if (items.length === 0) fail("No runs found in the given files.");
   const { port } = await startServer(staticSource(items), parsePort(values.port ?? "4177"));

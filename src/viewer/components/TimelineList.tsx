@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { NormalizedTrace, PairedToolCall } from "@core/types";
 import { formatCost, formatMs, formatSeconds, formatTokens } from "@core/format";
+import type { NormalizedTrace, PairedToolCall } from "@core/types";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CallDialog } from "@/components/CallDialog";
 import type { Replay } from "@/lib/use-replay";
 import { cn } from "@/lib/utils";
@@ -197,7 +197,11 @@ export function TimelineList({
               setOverTool(key !== null && callsByKey.has(key));
               return;
             }
-            if (!down.moved && Math.abs(e.clientX - down.x) < 4 && Math.abs(e.clientY - down.y) < 4) {
+            if (
+              !down.moved &&
+              Math.abs(e.clientX - down.x) < 4 &&
+              Math.abs(e.clientY - down.y) < 4
+            ) {
               return;
             }
             down.moved = true;
@@ -233,7 +237,11 @@ export function TimelineList({
           </span>
           <span className="relative min-w-0 flex-1">
             {ticks.map((t) => (
-              <span key={t} className="absolute translate-x-1.5" style={{ left: `${(t / total) * 100}%` }}>
+              <span
+                key={t}
+                className="absolute translate-x-1.5"
+                style={{ left: `${(t / total) * 100}%` }}
+              >
                 {formatSeconds(t)}
               </span>
             ))}
@@ -254,6 +262,7 @@ export function TimelineList({
           const isTool = row.kind === "tool";
           return (
             <button
+              type="button"
               key={row.key}
               ref={!isTool && selected ? selectedRef : undefined}
               onClick={() => {

@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import type { NormalizedTrace } from "@core/types";
 import { formatPercent, formatSeconds } from "@core/format";
+import type { NormalizedTrace } from "@core/types";
+import { useEffect, useRef, useState } from "react";
 import { TimelineList } from "@/components/TimelineList";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Section } from "@/components/ui/section";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SPEEDS, type Replay } from "@/lib/use-replay";
+import { type Replay, SPEEDS } from "@/lib/use-replay";
 import { cn } from "@/lib/utils";
 
 interface ReplayBarProps {
@@ -68,10 +68,7 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
     >
       <div
         ref={playerRef}
-        className={cn(
-          "flex min-h-0 flex-1 flex-col px-6 pb-4",
-          fullscreen && "bg-ta-grey-500 p-4",
-        )}
+        className={cn("flex min-h-0 flex-1 flex-col px-6 pb-4", fullscreen && "bg-ta-grey-500 p-4")}
       >
         {total <= 0 ? (
           <p className="type-accent-s border border-ta-grey-400 px-3 py-2 text-ta-grey-200">
@@ -96,7 +93,12 @@ export function ReplayBar({ trace, replay, selectedIndex, onSelect }: ReplayBarP
                 onSelect={onSelect}
               />
             )}
-            <PlayerControls replay={replay} onScrub={scrub} playerRef={playerRef} fullscreen={fullscreen} />
+            <PlayerControls
+              replay={replay}
+              onScrub={scrub}
+              playerRef={playerRef}
+              fullscreen={fullscreen}
+            />
           </>
         )}
       </div>
@@ -227,6 +229,7 @@ function Lanes({ trace, replay, selectedIndex, onSelect }: ReplayBarProps) {
           const lane = lanes.indexOf(gen.name);
           return (
             <button
+              type="button"
               key={gen.index}
               onClick={() => onSelect(gen.index)}
               aria-pressed={selected}

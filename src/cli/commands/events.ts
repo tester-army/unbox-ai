@@ -1,6 +1,13 @@
 import { toolCallNames } from "../../core/normalize";
 import type { LoadedTrace } from "../load";
-import { formatCallNames, formatCost, formatSeconds, formatTokens, printJson, table } from "../output";
+import {
+  formatCallNames,
+  formatCost,
+  formatSeconds,
+  formatTokens,
+  printJson,
+  table,
+} from "../output";
 
 /** Prints one table row per generation. */
 export function events(loaded: LoadedTrace, json: boolean): void {

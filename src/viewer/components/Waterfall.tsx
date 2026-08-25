@@ -1,7 +1,7 @@
-import { Fragment } from "react";
+import { formatCallNames, formatCost, formatSeconds, formatTokens } from "@core/format";
 import { toolCallNames } from "@core/normalize";
 import type { NormalizedTrace } from "@core/types";
-import { formatCallNames, formatCost, formatSeconds, formatTokens } from "@core/format";
+import { Fragment } from "react";
 import { cn } from "@/lib/utils";
 
 interface WaterfallProps {
@@ -25,6 +25,7 @@ export function Waterfall({ trace, selectedIndex, onSelect }: WaterfallProps) {
               </p>
             )}
             <button
+              type="button"
               onClick={() => onSelect(gen.index)}
               aria-pressed={gen.index === selectedIndex}
               title={`${formatTokens(gen.metrics.inputTokens)} in / ${formatTokens(gen.metrics.outputTokens)} out${gen.metrics.cost > 0 ? ` · ${formatCost(gen.metrics.cost)}` : ""}`}

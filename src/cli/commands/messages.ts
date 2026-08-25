@@ -24,7 +24,7 @@ export function messages(loaded: LoadedTrace, filter: MessagesFilter, json: bool
   const hits = loaded.trace.generations.flatMap((gen) =>
     gen.newMessages
       .filter((m) => filter.role === undefined || m.role === filter.role)
-      .filter((m) => filter.event === undefined || gen.index === filter.event)
+      .filter(() => filter.event === undefined || gen.index === filter.event)
       .map((m) => ({ gen: gen.index, match: findMatch(m, pattern), ...m }))
       .filter((hit) => hit.match !== null),
   );
@@ -52,7 +52,9 @@ export function messages(loaded: LoadedTrace, filter: MessagesFilter, json: bool
     );
   }
   if (hits.length > shown.length) {
-    console.log(`\n${hits.length - shown.length} more - narrow with --grep/--role/--event or raise --limit`);
+    console.log(
+      `\n${hits.length - shown.length} more - narrow with --grep/--role/--event or raise --limit`,
+    );
   }
 }
 
@@ -81,7 +83,5 @@ function findMatch(m: Message, pattern: RegExp | undefined): Match | null {
 
 function snippet(text: string, pattern: RegExp): string {
   const index = text.search(pattern);
-  return text
-    .slice(Math.max(0, index - 60), index + 160)
-    .replace(/\s+/g, " ");
+  return text.slice(Math.max(0, index - 60), index + 160).replace(/\s+/g, " ");
 }

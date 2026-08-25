@@ -1,6 +1,6 @@
-import { useState } from "react";
-import type { Generation, NormalizedTrace } from "@core/types";
 import { formatCost, formatPercent, formatSeconds, formatTokens } from "@core/format";
+import type { Generation, NormalizedTrace } from "@core/types";
+import { useState } from "react";
 import { MessageCard } from "@/components/MessageCard";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
@@ -28,9 +28,8 @@ export function GenerationDetail({ trace, generation }: GenerationDetailProps) {
       meta={
         <>
           {generation.model} · {formatTokens(m.inputTokens)} in / {formatTokens(m.outputTokens)}
-          {m.reasoningTokens !== undefined &&
-            ` (${formatTokens(m.reasoningTokens)} reasoning)`}{" "}
-          out ·{" "}
+          {m.reasoningTokens !== undefined && ` (${formatTokens(m.reasoningTokens)} reasoning)`} out
+          ·{" "}
           {generation.inProgress ? (
             <span className="text-ta-orange-300">streaming...</span>
           ) : (
@@ -42,47 +41,48 @@ export function GenerationDetail({ trace, generation }: GenerationDetailProps) {
       }
     >
       <div className="flex flex-col gap-3 px-6 pb-4">
-      <p className="type-accent-s text-ta-grey-200">
-        {generation.carriedMessages > 0
-          ? `${generation.carriedMessages} carried messages, showing the ${generation.newMessages.length} new`
-          : `fresh conversation (segment ${generation.segment}), ${generation.newMessages.length} messages`}
-        {generation.breakdown.cacheableTokens > 0 && (
-          <>
-            {" · "}
-            {formatPercent(generation.breakdown.cacheableTokens, generation.metrics.inputTokens)}{" "}
-            <Hint term="repeated prefix">repeated prefix</Hint>
-          </>
+        <p className="type-accent-s text-ta-grey-200">
+          {generation.carriedMessages > 0
+            ? `${generation.carriedMessages} carried messages, showing the ${generation.newMessages.length} new`
+            : `fresh conversation (segment ${generation.segment}), ${generation.newMessages.length} messages`}
+          {generation.breakdown.cacheableTokens > 0 && (
+            <>
+              {" · "}
+              {formatPercent(generation.breakdown.cacheableTokens, generation.metrics.inputTokens)}{" "}
+              <Hint term="repeated prefix">repeated prefix</Hint>
+            </>
+          )}
+          {generation.metrics.timeToFirstToken !== undefined && (
+            <>
+              {" · "}
+              <Hint term="prompt wait">prompt wait</Hint>{" "}
+              {formatPercent(generation.metrics.timeToFirstToken, generation.metrics.latency)} of
+              latency
+            </>
+          )}
+        </p>
+        {generation.carriedMessages > 0 && (
+          <Button className="self-start" onClick={() => setShowCarried((v) => !v)}>
+            {showCarried
+              ? "hide carried context"
+              : `show carried context (${generation.carriedMessages} messages)`}
+          </Button>
         )}
-        {generation.metrics.timeToFirstToken !== undefined && (
-          <>
-            {" · "}
-            <Hint term="prompt wait">prompt wait</Hint>{" "}
-            {formatPercent(generation.metrics.timeToFirstToken, generation.metrics.latency)} of latency
-          </>
+        {showCarried && (
+          <div className="flex flex-col gap-2 opacity-60">
+            {carried.map((message) => (
+              <MessageCard key={`carried-${message.index}`} message={message} />
+            ))}
+          </div>
         )}
-      </p>
-      {generation.carriedMessages > 0 && (
-        <Button className="self-start" onClick={() => setShowCarried((v) => !v)}>
-          {showCarried
-            ? "hide carried context"
-            : `show carried context (${generation.carriedMessages} messages)`}
-        </Button>
-      )}
-      {showCarried && (
-        <div className="flex flex-col gap-2 opacity-60">
-          {carried.map((message) => (
-            <MessageCard key={`carried-${message.index}`} message={message} />
+        {showCarried && carried.length > 0 && (
+          <p className="type-accent-s text-ta-grey-200">new in this generation ↓</p>
+        )}
+        <div className="flex flex-col gap-2">
+          {generation.newMessages.map((message) => (
+            <MessageCard key={message.index} message={message} />
           ))}
         </div>
-      )}
-      {showCarried && carried.length > 0 && (
-        <p className="type-accent-s text-ta-grey-200">new in this generation ↓</p>
-      )}
-      <div className="flex flex-col gap-2">
-        {generation.newMessages.map((message) => (
-          <MessageCard key={message.index} message={message} />
-        ))}
-      </div>
       </div>
     </Section>
   );

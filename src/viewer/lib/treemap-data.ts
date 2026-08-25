@@ -1,8 +1,4 @@
-import type {
-  BreakdownGroupKey,
-  Generation,
-  NormalizedTrace,
-} from "@core/types";
+import type { BreakdownGroupKey, Generation, NormalizedTrace } from "@core/types";
 
 export type TreemapScope = "generation" | "cumulative";
 export type TreemapSizeBy = "tokens" | "cost";

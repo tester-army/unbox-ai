@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Hint } from "@/components/ui/hint";
 import type { GlossaryTerm } from "@/lib/glossary";
 import { cn } from "@/lib/utils";
@@ -31,6 +31,7 @@ export function Section({
     <section className={cn("border-b border-ta-grey-400", className)}>
       <div className="flex min-h-13 items-center gap-4 px-6 py-2">
         <button
+          type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           className="type-accent-m flex cursor-pointer items-center gap-2 text-ta-sand-50"

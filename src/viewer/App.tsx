@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from "react";
 import type { RunSummary } from "@core/collection";
 import type { NormalizedTrace } from "@core/types";
+import { useEffect, useRef, useState } from "react";
 import { GenerationDetail } from "@/components/GenerationDetail";
-import { CopyButton } from "@/components/ui/copy-button";
 import { Header } from "@/components/Header";
 import { ReplayBar } from "@/components/ReplayBar";
 import { RunList } from "@/components/RunList";
 import { ToolCallsSection } from "@/components/ToolCallsSection";
 import { TreemapSection } from "@/components/TreemapSection";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Waterfall } from "@/components/Waterfall";
 import { useReplay } from "@/lib/use-replay";
 import { useTrace } from "@/lib/use-trace";
@@ -96,7 +96,9 @@ function Loaded({
   if (!selected) {
     return (
       <Shell>
-        {live ? <WaitingForCalls /> : (
+        {live ? (
+          <WaitingForCalls />
+        ) : (
           <p className="type-body-m p-8 text-ta-error">Trace has no generations.</p>
         )}
       </Shell>
@@ -122,11 +124,7 @@ function Loaded({
           {runs.length > 1 && (
             <RunList runs={runs} selectedId={selectedRun} onSelect={onSelectRun} />
           )}
-          <Waterfall
-            trace={trace}
-            selectedIndex={selected.index}
-            onSelect={selectGeneration}
-          />
+          <Waterfall trace={trace} selectedIndex={selected.index} onSelect={selectGeneration} />
         </aside>
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]">
           {/* context + timeline fill exactly the first viewport; the rest scrolls in */}
@@ -182,7 +180,15 @@ function WaitingForCalls() {
   );
 }
 
-function SetupStep({ n, label, children }: { n: number; label: string; children: React.ReactNode }) {
+function SetupStep({
+  n,
+  label,
+  children,
+}: {
+  n: number;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <p className="type-accent-s text-ta-grey-200">

@@ -1,5 +1,5 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runSummaries, type TraceCollectionItem } from "../core/collection";
@@ -90,7 +90,8 @@ export async function startServer(
     // must come from a page this server itself served
     if (url.pathname.startsWith("/api/")) {
       const { host, origin } = req.headers;
-      const originHost = typeof origin === "string" ? origin.replace(/^https?:\/\//, "") : undefined;
+      const originHost =
+        typeof origin === "string" ? origin.replace(/^https?:\/\//, "") : undefined;
       if (
         host === undefined ||
         !allowedHosts().has(host) ||
@@ -158,9 +159,7 @@ export async function startServer(
     } catch {
       // SPA fallback for extension-less deep links only; missing assets stay a hard 404
       const index =
-        extname(path) === ""
-          ? await readFile(join(dir, "index.html")).catch(() => null)
-          : null;
+        extname(path) === "" ? await readFile(join(dir, "index.html")).catch(() => null) : null;
       if (index) {
         res.writeHead(200, { "content-type": "text/html" }).end(index);
       } else {

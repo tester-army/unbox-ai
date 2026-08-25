@@ -1,9 +1,9 @@
-import { useState } from "react";
-import type { Message, MessageRole } from "@core/types";
 import { formatCompact, formatTokens } from "@core/format";
+import { prettyArgs, prettyPayload } from "@core/pretty";
+import type { Message, MessageRole } from "@core/types";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
-import { prettyArgs, prettyPayload } from "@core/pretty";
 import { cn } from "@/lib/utils";
 
 const COLLAPSED_CHARS = 700;
@@ -74,21 +74,22 @@ function Thinking({ reasoning }: { reasoning: string }) {
   const [open, setOpen] = useState(false);
   if (!reasoning) {
     return (
-      <p className="type-accent-s mb-2 text-ta-grey-200">
-        thinking · content withheld by provider
-      </p>
+      <p className="type-accent-s mb-2 text-ta-grey-200">thinking · content withheld by provider</p>
     );
   }
   const overflows = reasoning.length > THINKING_PREVIEW_CHARS;
   return (
     <div className="mb-2 border border-ta-grey-400 bg-ta-grey-500 px-3 py-2">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className="type-accent-s flex w-full cursor-pointer items-center gap-2 text-left text-ta-sand-300"
       >
         <span>{open ? "▾" : "▸"} thinking</span>
-        <span className="text-ta-grey-200">~{formatTokens(Math.round(reasoning.length / 4))} tok</span>
+        <span className="text-ta-grey-200">
+          ~{formatTokens(Math.round(reasoning.length / 4))} tok
+        </span>
       </button>
       <p
         className={cn(

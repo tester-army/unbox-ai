@@ -19,10 +19,7 @@ function Tabs<T extends string>({ value, onValueChange, children }: TabsProps<T>
 
 function TabsList({ className, ...props }: ComponentProps<typeof BaseTabs.List>) {
   return (
-    <BaseTabs.List
-      className={cn("inline-flex border border-ta-grey-400", className)}
-      {...props}
-    />
+    <BaseTabs.List className={cn("inline-flex border border-ta-grey-400", className)} {...props} />
   );
 }
 

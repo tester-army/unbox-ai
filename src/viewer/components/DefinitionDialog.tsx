@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
 import { contentToText } from "@core/normalize";
+import { prettyArgs, prettyPayload } from "@core/pretty";
 import type { RawMessage, RawToolDef } from "@core/types";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Markdown } from "@/components/ui/markdown";
-import { prettyArgs, prettyPayload } from "@core/pretty";
 import type { TreemapLeaf } from "@/lib/treemap-data";
 
 /** Full definition of a clicked treemap block: pretty-rendered, raw JSON a toggle away. */
@@ -131,9 +131,12 @@ function MessageDefinition({ message }: { message: RawMessage }) {
   const text = prettyPayload(contentToText(message.content));
   return (
     <div className="flex flex-col gap-5">
-      {text && (looksLikeMarkdown(text) ? <Markdown>{text}</Markdown> : (
-        <p className="type-body-m whitespace-pre-wrap text-ta-grey-100">{text}</p>
-      ))}
+      {text &&
+        (looksLikeMarkdown(text) ? (
+          <Markdown>{text}</Markdown>
+        ) : (
+          <p className="type-body-m whitespace-pre-wrap text-ta-grey-100">{text}</p>
+        ))}
       {message.tool_calls?.map((call) => (
         <div key={call.id} className="border border-ta-grey-400 bg-ta-grey-450 px-4 py-3">
           <p className="type-accent-s text-ta-orange-75">{call.function.name}</p>

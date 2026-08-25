@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import type { RunSummary } from "@core/collection";
 import type { NormalizedTrace } from "@core/types";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface TraceState {
   /** One entry per independent run, chronological; absent until loaded. */
