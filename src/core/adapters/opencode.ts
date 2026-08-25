@@ -87,8 +87,7 @@ function adaptOpencodeTrace(oc: OpencodeExport): RawTrace {
     // model time excludes tool execution, which the message duration includes
     const toolSeconds =
       message.parts.reduce((acc, p) => acc + (p.type === "tool" ? (toolMs(p) ?? 0) : 0), 0) / 1000;
-    const duration =
-      Math.max(messageSeconds(message) - toolSeconds, 0) / Math.max(steps.length, 1);
+    const duration = Math.max(messageSeconds(message) - toolSeconds, 0) / Math.max(steps.length, 1);
     for (const step of steps) {
       const finish = step.find((p) => p.type === "step-finish");
       const tools = step.filter((p) => p.type === "tool");

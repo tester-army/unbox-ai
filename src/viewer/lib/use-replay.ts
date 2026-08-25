@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
 import type { Generation, NormalizedTrace } from "@core/types";
+import { useEffect, useMemo, useState } from "react";
 
 export const SPEEDS = [1, 4, 8];
 

@@ -1,16 +1,12 @@
-import { useMemo, useState } from "react";
-import type { Generation, NormalizedTrace } from "@core/types";
 import { formatPercent, formatTokens } from "@core/format";
+import type { Generation, NormalizedTrace } from "@core/types";
+import { useMemo, useState } from "react";
 import { DefinitionDialog } from "@/components/DefinitionDialog";
 import { Treemap } from "@/components/Treemap";
 import { Hint } from "@/components/ui/hint";
 import { Section } from "@/components/ui/section";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  buildTreemapData,
-  type TreemapScope,
-  type TreemapSizeBy,
-} from "@/lib/treemap-data";
+import { buildTreemapData, type TreemapScope, type TreemapSizeBy } from "@/lib/treemap-data";
 
 interface TreemapSectionProps {
   trace: NormalizedTrace;
@@ -86,14 +82,20 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
                 ~{formatTokens(inspected.estTokens)} tok (
                 {formatPercent(inspected.estTokens, totalTokens)})
                 {inspected.sentCount > 1 ? ` sent ${inspected.sentCount}x` : ""}
-                {inspected.cached === undefined ? "" : inspected.cached ? " · repeated prefix" : " · fresh"}
+                {inspected.cached === undefined
+                  ? ""
+                  : inspected.cached
+                    ? " · repeated prefix"
+                    : " · fresh"}
               </span>
               <span className="type-body-s min-w-0 truncate normal-case text-ta-grey-200">
                 {inspected.preview || "(no text)"}
               </span>
             </>
           ) : (
-            <span className="text-ta-grey-200">hover a block to inspect it · click to pin its full definition</span>
+            <span className="text-ta-grey-200">
+              hover a block to inspect it · click to pin its full definition
+            </span>
           )}
         </div>
         {pinned && (

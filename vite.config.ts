@@ -24,8 +24,7 @@ function devTraceApi(): Plugin {
         const url = new URL(req.url ?? "", "http://localhost");
         const items = loadItems();
         const id = url.searchParams.get("id");
-        const item =
-          id === null ? items.at(-1) : items.find((it) => it.trace.traceId === id);
+        const item = id === null ? items.at(-1) : items.find((it) => it.trace.traceId === id);
         return { url, item };
       };
       const send = (res: import("node:http").ServerResponse, status: number, body: unknown) => {

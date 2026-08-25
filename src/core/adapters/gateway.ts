@@ -9,9 +9,7 @@ import type { TraceAdapter } from "./adapter";
 export const gatewayAdapter: TraceAdapter<RawTrace> = {
   name: "gateway",
   detect(json: unknown): json is RawTrace {
-    return (
-      typeof json === "object" && json !== null && Array.isArray((json as RawTrace).events)
-    );
+    return typeof json === "object" && json !== null && Array.isArray((json as RawTrace).events);
   },
   adapt(json: RawTrace): RawTrace {
     assertTraceShape(json);

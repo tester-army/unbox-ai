@@ -8,5 +8,7 @@ export function openBrowser(url: string): void {
       : process.platform === "win32"
         ? ["cmd", ["/c", "start", "", url]]
         : ["xdg-open", [url]];
-  spawn(command, args, { stdio: "ignore", detached: true }).on("error", () => {}).unref();
+  spawn(command, args, { stdio: "ignore", detached: true })
+    .on("error", () => {})
+    .unref();
 }

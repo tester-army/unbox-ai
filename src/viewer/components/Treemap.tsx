@@ -1,7 +1,7 @@
-import { hierarchy, treemap, treemapSquarify, type HierarchyRectangularNode } from "d3-hierarchy";
-import { useMemo } from "react";
-import type { BreakdownGroupKey } from "@core/types";
 import { formatTokens } from "@core/format";
+import type { BreakdownGroupKey } from "@core/types";
+import { type HierarchyRectangularNode, hierarchy, treemap, treemapSquarify } from "d3-hierarchy";
+import { useMemo } from "react";
 import type { TreemapGroupData, TreemapLeaf } from "@/lib/treemap-data";
 import { useElementSize } from "@/lib/use-element-size";
 import { cn } from "@/lib/utils";
@@ -113,7 +113,9 @@ function GroupBlock({ node, group, children }: GroupBlockProps) {
         style={{ left: node.x0, top: node.y0, width, height: node.y1 - node.y0 }}
       >
         {width > 70 && (
-          <span className={cn("type-accent-s absolute left-1 top-0.5", GROUP_STYLE[group.key].label)}>
+          <span
+            className={cn("type-accent-s absolute left-1 top-0.5", GROUP_STYLE[group.key].label)}
+          >
             {group.key} ~{formatTokens(group.estTokens)}
           </span>
         )}
@@ -137,6 +139,7 @@ function LeafBlock({ node, leaf, onInspect, onOpen }: LeafBlockProps) {
   const style = GROUP_STYLE[leaf.group];
   return (
     <button
+      type="button"
       className={cn(
         "absolute cursor-pointer overflow-hidden text-left transition-colors",
         leaf.cached ? style.cachedBlock : style.block,

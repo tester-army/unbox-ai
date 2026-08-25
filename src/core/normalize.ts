@@ -68,9 +68,7 @@ export function assertTraceShape(raw: unknown): asserts raw is RawTrace {
       typeof m.latency !== "number" ||
       typeof m.cost !== "number"
     ) {
-      throw new Error(
-        `Unsupported trace: events[${i}] is missing metrics (latency, tokens, cost)`,
-      );
+      throw new Error(`Unsupported trace: events[${i}] is missing metrics (latency, tokens, cost)`);
     }
   }
 }
@@ -115,9 +113,7 @@ function assignSegments(events: RawEvent[]): EventPosition[] {
         break;
       }
     }
-    positions.push(
-      found ?? { segment: segments++, carried: 0, prevIndex: null, firstMutation: 0 },
-    );
+    positions.push(found ?? { segment: segments++, carried: 0, prevIndex: null, firstMutation: 0 });
   });
   return positions;
 }
@@ -141,7 +137,10 @@ function continuationOf(prev: RawMessage[], next: RawMessage[]): number | null {
     const structurallySame =
       a.role === b.role &&
       a.tool_call_id === b.tool_call_id &&
-      deepEqual(a.tool_calls?.map((c) => c.id), b.tool_calls?.map((c) => c.id));
+      deepEqual(
+        a.tool_calls?.map((c) => c.id),
+        b.tool_calls?.map((c) => c.id),
+      );
     if (structurallySame && isCompacted(b)) {
       firstMutation = Math.min(firstMutation, k);
       continue;
@@ -161,7 +160,10 @@ function argsFilledIn(a: RawMessage, b: RawMessage): boolean {
   return callsA.every((call, i) => {
     const other = callsB[i]!;
     if (call.id !== other.id || call.function.name !== other.function.name) return false;
-    return deepEqual(call.function.arguments, other.function.arguments) || isEmptyArgs(call.function.arguments);
+    return (
+      deepEqual(call.function.arguments, other.function.arguments) ||
+      isEmptyArgs(call.function.arguments)
+    );
   });
 }
 
@@ -188,11 +190,11 @@ export function toolCallNames(gen: Generation): string[] {
 }
 
 /** Every tool call in the trace, in order, tagged with its generation index. */
-export function allToolCalls(
-  trace: NormalizedTrace,
-): (PairedToolCall & { gen: number })[] {
+export function allToolCalls(trace: NormalizedTrace): (PairedToolCall & { gen: number })[] {
   return trace.generations.flatMap((gen) =>
-    gen.newMessages.flatMap((m) => (m.toolCalls ?? []).map((call) => ({ ...call, gen: gen.index }))),
+    gen.newMessages.flatMap((m) =>
+      (m.toolCalls ?? []).map((call) => ({ ...call, gen: gen.index })),
+    ),
   );
 }
 
@@ -246,7 +248,9 @@ function normalizeEvent(
     .slice(carried)
     .map((message, offset) => ({ raw: message, index: carried + offset }))
     // paired results render inline under their call; orphans stay visible
-    .filter(({ raw }) => !(isToolResult(raw) && pairing.callIds.has(`${segment}:${raw.tool_call_id}`)))
+    .filter(
+      ({ raw }) => !(isToolResult(raw) && pairing.callIds.has(`${segment}:${raw.tool_call_id}`)),
+    )
     .map(({ raw, index }) => normalizeMessage(raw, index, segment, pairing));
 
   return {
@@ -464,8 +468,7 @@ function attachmentLabel(part: {
 }): string | undefined {
   if (part?.type !== "file" && part?.type !== "image") return undefined;
   const media = typeof part.mediaType === "string" ? part.mediaType : "unknown type";
-  const stub =
-    typeof part.file === "string" && part.file.length < 100 ? ` (${part.file})` : "";
+  const stub = typeof part.file === "string" && part.file.length < 100 ? ` (${part.file})` : "";
   return `[attachment: ${media}${stub} - bytes not included in the trace export]`;
 }
 
@@ -593,7 +596,8 @@ function preview(message: RawMessage): string {
   const text = contentToText(message.content);
   if (text) return text.slice(0, 280);
   const call = message.tool_calls?.[0];
-  if (call) return `${call.function.name}(${JSON.stringify(call.function.arguments ?? {})})`.slice(0, 280);
+  if (call)
+    return `${call.function.name}(${JSON.stringify(call.function.arguments ?? {})})`.slice(0, 280);
   return "";
 }
 

@@ -23,7 +23,8 @@ export function event(loaded: LoadedTrace, index: number, json: boolean): void {
     return;
   }
   const m = gen.metrics;
-  const ttft = m.timeToFirstToken !== undefined ? ` (ttft ${formatSeconds(m.timeToFirstToken)})` : "";
+  const ttft =
+    m.timeToFirstToken !== undefined ? ` (ttft ${formatSeconds(m.timeToFirstToken)})` : "";
   console.log(
     `generation ${gen.index}  seg ${gen.segment}  ${gen.model}  ` +
       `${formatTokens(m.inputTokens)} in / ${formatTokens(m.outputTokens)} out  ` +
@@ -43,11 +44,13 @@ export function event(loaded: LoadedTrace, index: number, json: boolean): void {
       : `context: fresh conversation, ${gen.newMessages.length} messages${folded}`,
   );
   console.log("");
-  gen.newMessages.forEach((message) => printMessage(message, gen.index));
+  for (const message of gen.newMessages) printMessage(message, gen.index);
 }
 
 function printMessage(message: Message, genIndex: number): void {
-  console.log(`--- [${message.index}] ${message.role} (~${formatTokens(message.approxTokens)} tok)`);
+  console.log(
+    `--- [${message.index}] ${message.role} (~${formatTokens(message.approxTokens)} tok)`,
+  );
   if (message.reasoning !== undefined) {
     console.log(
       message.reasoning

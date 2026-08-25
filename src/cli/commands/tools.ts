@@ -27,7 +27,10 @@ export function tools(loaded: LoadedTrace, json: boolean, all: boolean): void {
       status(call.success, call.result !== undefined),
       call.durationMs !== undefined ? formatMs(call.durationMs) : "-",
       call.result !== undefined ? formatCompact(call.result.length) : "-",
-      truncate(JSON.stringify(call.args) ?? "", undefined, ARGS_PREVIEW_CHARS).replace(/\n.*/s, "..."),
+      truncate(JSON.stringify(call.args) ?? "", undefined, ARGS_PREVIEW_CHARS).replace(
+        /\n.*/s,
+        "...",
+      ),
     ]);
     console.log(table(["gen", "name", "status", "time", "size", "args"], rows));
     console.log(`\ndrill in: unbox-ai event ${getTraceRef()} <gen>`);
@@ -56,7 +59,9 @@ export function tools(loaded: LoadedTrace, json: boolean, all: boolean): void {
       formatCompact(u.totalSize),
     ]);
   console.log(table(["tool", "calls", "failed", "time", "output"], rows));
-  console.log(`\n${calls.length} calls across ${byName.size} tools · every call: unbox-ai tools ${getTraceRef()} --all`);
+  console.log(
+    `\n${calls.length} calls across ${byName.size} tools · every call: unbox-ai tools ${getTraceRef()} --all`,
+  );
 }
 
 function status(success: boolean | undefined, hasResult: boolean): string {

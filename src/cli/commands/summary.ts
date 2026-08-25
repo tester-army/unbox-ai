@@ -2,7 +2,14 @@ import { formatPercent } from "../../core/format";
 import { computeInsights } from "../../core/insights";
 import { toolCallNames } from "../../core/normalize";
 import type { LoadedTrace } from "../load";
-import { formatCallNames, formatCost, formatSeconds, formatTokens, getTraceRef, printJson } from "../output";
+import {
+  formatCallNames,
+  formatCost,
+  formatSeconds,
+  formatTokens,
+  getTraceRef,
+  printJson,
+} from "../output";
 
 /** Prints trace totals plus a one-liner per generation. */
 export function summary(loaded: LoadedTrace, json: boolean): void {

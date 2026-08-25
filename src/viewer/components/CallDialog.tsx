@@ -1,10 +1,10 @@
-import { useState } from "react";
-import type { PairedToolCall } from "@core/types";
 import { formatMs } from "@core/format";
+import { prettyArgs, prettyPayload } from "@core/pretty";
+import type { PairedToolCall } from "@core/types";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { prettyArgs, prettyPayload } from "@core/pretty";
 
 interface CallDialogProps {
   call: PairedToolCall;

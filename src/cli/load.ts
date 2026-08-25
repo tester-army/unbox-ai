@@ -48,7 +48,9 @@ export function loadRun(path: string, selector: string): LoadedTrace {
       ? items[Number(selector)]
       : items.find(({ trace }) => trace.traceId === selector);
     if (!item) {
-      throw new Error(`No run "${selector}" (${items.length} runs). List them: unbox-ai runs ${path}`);
+      throw new Error(
+        `No run "${selector}" (${items.length} runs). List them: unbox-ai runs ${path}`,
+      );
     }
     return { path, format, raw: item.raw, trace: item.trace };
   } catch (error) {
