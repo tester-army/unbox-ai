@@ -78,8 +78,29 @@ export async function startServer(
 ): Promise<{ servers: Server[]; port: number }> {
   const dir = viewerDir();
 
+  // set once listen() resolves; requests only arrive after that
+  let boundPort = preferredPort;
+  const allowedHosts = () =>
+    new Set([`localhost:${boundPort}`, `127.0.0.1:${boundPort}`, `[::1]:${boundPort}`]);
+
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    // DNS-rebinding and cross-site protection for everything under /api:
+    // the Host must be this server's own, and browser requests (Origin set)
+    // must come from a page this server itself served
+    if (url.pathname.startsWith("/api/")) {
+      const { host, origin } = req.headers;
+      const originHost = typeof origin === "string" ? origin.replace(/^https?:\/\//, "") : undefined;
+      if (
+        host === undefined ||
+        !allowedHosts().has(host) ||
+        (originHost !== undefined && !allowedHosts().has(originHost))
+      ) {
+        res.writeHead(403, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "forbidden" }));
+        return;
+      }
+    }
     if (url.pathname === "/api/traces") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(source.current().listJson);
@@ -149,7 +170,9 @@ export async function startServer(
   };
 
   const hosts = source.live ? ["127.0.0.1", "::1"] : ["127.0.0.1"];
-  return listen(handler, hosts, preferredPort, options.exactPort ? 1 : 10);
+  const bound = await listen(handler, hosts, preferredPort, options.exactPort ? 1 : 10);
+  boundPort = bound.port;
+  return bound;
 }
 
 /**
@@ -185,6 +208,8 @@ async function serveNotify(
   try {
     dbPath = (JSON.parse(await readBody(req)) as { dbPath?: unknown }).dbPath;
   } catch {
+    // an oversized body drops the connection; nothing left to respond to
+    if (req.destroyed) return;
     // a malformed body still triggers a reload of the current db path
   }
   const accepted = source.notify!(dbPath);
@@ -197,7 +222,10 @@ function readBody(req: IncomingMessage, limit = 64 * 1024): Promise<string> {
     let body = "";
     req.on("data", (chunk: Buffer) => {
       body += chunk.toString("utf8");
-      if (body.length > limit) reject(new Error("body too large"));
+      if (body.length > limit) {
+        reject(new Error("body too large"));
+        req.destroy();
+      }
     });
     req.on("end", () => resolve(body));
     req.on("error", reject);

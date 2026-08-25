@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, resolve, sep } from "node:path";
 import { parseCollection } from "../core/collection";
 import { buildCollection, type TraceSource } from "./server";
 
@@ -68,7 +68,12 @@ export function createLiveSource(defaultDbPath: string): TraceSource & { reload(
   };
 }
 
-/** Only real .devtools/generations.json files are accepted from notify payloads. */
+/**
+ * Only real .devtools/generations.json files under the viewer's cwd are
+ * accepted from notify payloads - start `unbox-ai devtools` at the workspace
+ * root when apps live deeper. Anything else could point the viewer at
+ * another project's captured prompts.
+ */
 function validateDbPath(path: unknown): string | undefined {
   if (typeof path !== "string") return undefined;
   const isDbFile = (p: string) =>
@@ -79,6 +84,8 @@ function validateDbPath(path: unknown): string | undefined {
     const stats = statSync(resolved);
     if (!stats.isFile() || stats.size > MAX_DB_BYTES) return undefined;
     const real = realpathSync(resolved);
+    const root = realpathSync(process.cwd());
+    if (real !== root && !real.startsWith(root + sep)) return undefined;
     return isDbFile(real) ? real : undefined;
   } catch {
     return undefined;
