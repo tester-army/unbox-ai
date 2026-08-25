@@ -3,3 +3,4 @@ dist/
 *.log
 .DS_Store
 *.trace.json
+.tmp-vitest-live/
