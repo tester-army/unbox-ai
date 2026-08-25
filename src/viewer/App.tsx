@@ -117,7 +117,8 @@ function Loaded({
         onClear={live ? () => void fetch("/api/clear", { method: "POST" }) : undefined}
       />
       <div className="flex min-h-0 flex-1">
-        <aside className="w-80 shrink-0 overflow-y-auto border-r border-ta-grey-400">
+        {/* stable gutters: a scrollbar appearing mid-stream must not shift the layout */}
+        <aside className="w-80 shrink-0 overflow-y-auto border-r border-ta-grey-400 [scrollbar-gutter:stable]">
           {runs.length > 1 && (
             <RunList runs={runs} selectedId={selectedRun} onSelect={onSelectRun} />
           )}
@@ -127,7 +128,7 @@ function Loaded({
             onSelect={selectGeneration}
           />
         </aside>
-        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto [scrollbar-gutter:stable]">
           {/* context + timeline fill exactly the first viewport; the rest scrolls in */}
           <div className="flex h-full shrink-0 flex-col">
             <TreemapSection trace={trace} generation={selected} />
