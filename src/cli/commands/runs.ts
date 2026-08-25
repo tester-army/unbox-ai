@@ -21,7 +21,9 @@ export function runs(items: TraceCollectionItem[], json: boolean): void {
         formatTokens(run.totalTokens.input),
         formatTokens(run.totalTokens.output),
         run.timestamp,
-        (run.inProgress ? "[live] " : "") +
+        "  ".repeat(run.depth) +
+          (run.depth > 0 ? "> " : "") +
+          (run.inProgress ? "[live] " : "") +
           (run.name.length > 60 ? `${run.name.slice(0, 60)}...` : run.name),
       ]),
     ),

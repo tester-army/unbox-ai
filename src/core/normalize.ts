@@ -46,6 +46,7 @@ export function normalizeTrace(raw: RawTrace): NormalizedTrace {
     models: [...new Set(generations.map((g) => g.model))],
     segmentCount,
     ...(raw.in_progress ? { inProgress: true } : {}),
+    ...(raw.parent_trace_id !== undefined ? { parentTraceId: raw.parent_trace_id } : {}),
     generations,
   };
 }
@@ -577,6 +578,12 @@ function withoutResponse(messages: RawMessage[]): RawMessage[] {
 function scaleToReportedTokens(items: BreakdownItem[], inputTokens: number): void {
   const totalChars = sum(items.map((item) => item.chars));
   if (totalChars === 0) return;
+  // an in-flight generation has no usage yet - keep char-based estimates
+  // instead of scaling everything to a reported 0
+  if (inputTokens === 0) {
+    for (const item of items) item.estTokens = Math.round(item.chars / CHARS_PER_TOKEN);
+    return;
+  }
   for (const item of items) {
     item.estTokens = Math.round((item.chars / totalChars) * inputTokens);
   }

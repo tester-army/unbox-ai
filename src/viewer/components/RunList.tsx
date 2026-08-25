@@ -15,9 +15,7 @@ export function RunList({ runs, selectedId, onSelect }: RunListProps) {
       <p className="type-accent-s mb-1 mt-4 px-4 text-ta-grey-200">
         runs · {runs.length}
       </p>
-      {runs
-        .map((run, number) => ({ run, number }))
-        .reverse()
+      {newestFirstTrees(runs)
         .map(({ run, number }) => {
           const selected = run.id === selectedId;
           return (
@@ -44,7 +42,9 @@ export function RunList({ runs, selectedId, onSelect }: RunListProps) {
                   "min-w-0 flex-1 truncate",
                   selected ? "text-ta-sand-50" : "text-ta-grey-100",
                 )}
+                style={run.depth > 0 ? { paddingLeft: run.depth * 12 } : undefined}
               >
+                {run.depth > 0 && <span className="text-ta-grey-300">↳ </span>}
                 {run.name}
               </span>
               <span
@@ -64,4 +64,17 @@ export function RunList({ runs, selectedId, onSelect }: RunListProps) {
         })}
     </div>
   );
+}
+
+/**
+ * Newest root first, but each root keeps its nested runs right below it -
+ * plain reversal would detach children (the list arrives depth-first).
+ */
+function newestFirstTrees(runs: RunSummary[]): { run: RunSummary; number: number }[] {
+  const trees: { run: RunSummary; number: number }[][] = [];
+  runs.forEach((run, number) => {
+    if (run.depth === 0 || trees.length === 0) trees.push([]);
+    trees.at(-1)!.push({ run, number });
+  });
+  return trees.reverse().flat();
 }

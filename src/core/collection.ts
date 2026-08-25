@@ -22,6 +22,8 @@ export interface RunSummary {
   totalTokens: { input: number; output: number };
   models: string[];
   inProgress?: boolean;
+  /** Nesting level under the spawning run; 0 for roots. */
+  depth: number;
 }
 
 /**
@@ -41,6 +43,7 @@ export function parseCollection(json: unknown): TraceCollection {
 }
 
 export function runSummaries(items: TraceCollectionItem[]): RunSummary[] {
+  const parents = new Map(items.map(({ trace }) => [trace.traceId, trace.parentTraceId]));
   return items.map(({ trace }) => ({
     id: trace.traceId,
     name: trace.name,
@@ -49,5 +52,18 @@ export function runSummaries(items: TraceCollectionItem[]): RunSummary[] {
     totalTokens: trace.totalTokens,
     models: trace.models,
     ...(trace.inProgress ? { inProgress: true } : {}),
+    depth: depthOf(trace.traceId, parents),
   }));
+}
+
+/** Ancestors counted only while present in the collection; cycle-guarded. */
+function depthOf(id: string, parents: Map<string, string | undefined>): number {
+  const seen = new Set([id]);
+  let depth = 0;
+  for (let cur = parents.get(id); cur !== undefined && parents.has(cur) && !seen.has(cur); ) {
+    depth++;
+    seen.add(cur);
+    cur = parents.get(cur);
+  }
+  return depth;
 }

@@ -10,9 +10,13 @@ import type { TraceAdapter } from "./adapter";
  * next step's prompt repeats prompt + response verbatim, so segment
  * continuation and tool pairing work unchanged.
  *
- * A database holds many independent runs; split() turns each root run (with
- * its nested child runs) into its own trace. adapt() on the whole database
- * still yields one merged trace for the text commands.
+ * A database holds many independent runs; split() turns every run - root or
+ * nested child - into its own trace, children ordered right after their
+ * parent. Children stay separate rather than bundled because the telemetry
+ * integration can mis-attribute a concurrent sibling as a child (its
+ * current-tool tracking is a process-wide singleton) - bundling would make
+ * such a run invisible. adapt() on the whole database still yields one
+ * merged trace for the text commands.
  */
 export const aiSdkDevtoolsAdapter: TraceAdapter<DevtoolsDb> = {
   name: "ai-sdk-devtools",
@@ -93,7 +97,7 @@ function isDevtoolsDb(raw: unknown): raw is DevtoolsDb {
   );
 }
 
-/** One part per root run, each carrying the root's nested child runs. */
+/** One part per run, depth-first so children list right after their parent. */
 function splitDevtoolsDb(db: DevtoolsDb): DevtoolsDb[] {
   const known = new Set(db.runs.map((run) => run.id));
   // a run whose parent is not in the file cannot nest anywhere - treat as root
@@ -106,12 +110,16 @@ function splitDevtoolsDb(db: DevtoolsDb): DevtoolsDb[] {
       children.set(run.parent_run_id, siblings);
     }
   }
-  return roots.map((root) => {
-    const runs = [root];
-    for (const run of runs) runs.push(...(children.get(run.id) ?? []));
-    const ids = new Set(runs.map((run) => run.id));
-    return { runs, steps: db.steps.filter((step) => ids.has(step.run_id)) };
-  });
+  const ordered: DevtoolsRun[] = [];
+  const visit = (run: DevtoolsRun) => {
+    ordered.push(run);
+    for (const child of children.get(run.id) ?? []) visit(child);
+  };
+  roots.forEach(visit);
+  return ordered.map((run) => ({
+    runs: [run],
+    steps: db.steps.filter((step) => step.run_id === run.id),
+  }));
 }
 
 function adaptDevtoolsDb(db: DevtoolsDb): RawTrace {
@@ -133,6 +141,9 @@ function adaptDevtoolsDb(db: DevtoolsDb): RawTrace {
     },
     total_cost: 0,
     ...(events.some((e) => e.in_progress) ? { in_progress: true } : {}),
+    ...(db.runs.length === 1 && db.runs[0]!.parent_run_id
+      ? { parent_trace_id: db.runs[0]!.parent_run_id }
+      : {}),
     events,
   };
 }

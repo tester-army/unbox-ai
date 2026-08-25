@@ -7,6 +7,8 @@ export interface RawTrace {
   total_cost: number;
   /** Adapter-provided: a generation is still running (live devtools). */
   in_progress?: boolean;
+  /** Trace id of the run that spawned this one (nested agent runs). */
+  parent_trace_id?: string;
   events: RawEvent[];
 }
 
@@ -70,6 +72,8 @@ export interface NormalizedTrace {
   segmentCount: number;
   /** True while a generation of this trace is still running (live devtools). */
   inProgress?: boolean;
+  /** Trace id of the run that spawned this one (nested agent runs). */
+  parentTraceId?: string;
   generations: Generation[];
 }
 
