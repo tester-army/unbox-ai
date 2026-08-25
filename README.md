@@ -176,6 +176,7 @@ npm install
 UNBOX_TRACE=path/to/trace.json npm run dev   # viewer with live reload
 npm run build                                 # dist/viewer + dist/cli
 node dist/cli/index.js summary path/to/trace.json
+npm run check                                 # lint (biome) + typecheck + tests (vitest)
 ```
 
 ## License
