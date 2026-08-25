@@ -27,10 +27,17 @@ export function GenerationDetail({ trace, generation }: GenerationDetailProps) {
       hint="generation"
       meta={
         <>
-          {generation.model} · {formatTokens(m.inputTokens)} in / {formatTokens(m.outputTokens)}{" "}
-          out · {formatSeconds(m.latency)}
-          {m.timeToFirstToken !== undefined && ` (ttft ${formatSeconds(m.timeToFirstToken)})`} ·{" "}
-          {formatCost(m.cost)} · {generation.toolCount} tools
+          {generation.model} · {formatTokens(m.inputTokens)} in / {formatTokens(m.outputTokens)}
+          {m.reasoningTokens !== undefined &&
+            ` (${formatTokens(m.reasoningTokens)} reasoning)`}{" "}
+          out ·{" "}
+          {generation.inProgress ? (
+            <span className="text-ta-orange-300">streaming...</span>
+          ) : (
+            formatSeconds(m.latency)
+          )}
+          {m.timeToFirstToken !== undefined && ` (ttft ${formatSeconds(m.timeToFirstToken)})`}
+          {m.cost > 0 && <> · {formatCost(m.cost)}</>} · {generation.toolCount} tools
         </>
       }
     >

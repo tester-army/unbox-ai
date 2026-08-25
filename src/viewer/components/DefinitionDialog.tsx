@@ -9,7 +9,15 @@ import { prettyArgs, prettyPayload } from "@core/pretty";
 import type { TreemapLeaf } from "@/lib/treemap-data";
 
 /** Full definition of a clicked treemap block: pretty-rendered, raw JSON a toggle away. */
-export function DefinitionDialog({ leaf, onClose }: { leaf: TreemapLeaf; onClose: () => void }) {
+export function DefinitionDialog({
+  traceId,
+  leaf,
+  onClose,
+}: {
+  traceId: string;
+  leaf: TreemapLeaf;
+  onClose: () => void;
+}) {
   const [value, setValue] = useState<unknown>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [showRaw, setShowRaw] = useState(false);
@@ -18,13 +26,13 @@ export function DefinitionDialog({ leaf, onClose }: { leaf: TreemapLeaf; onClose
     let cancelled = false;
     setValue(undefined);
     setError(null);
-    fetchRawValue(leaf.ref)
+    fetchRawValue(traceId, leaf.ref)
       .then((v) => !cancelled && setValue(v))
       .catch((e) => !cancelled && setError(String(e)));
     return () => {
       cancelled = true;
     };
-  }, [leaf.ref]);
+  }, [traceId, leaf.ref]);
 
   const isTool = leaf.ref.includes("available_tools");
   return (
@@ -148,8 +156,10 @@ function Mono({ children }: { children: string }) {
 }
 
 /** Fetches a raw-trace value, failing legibly when the server is older than the viewer. */
-async function fetchRawValue(ref: string): Promise<unknown> {
-  const res = await fetch(`/api/raw?path=${encodeURIComponent(ref)}`);
+async function fetchRawValue(traceId: string, ref: string): Promise<unknown> {
+  const res = await fetch(
+    `/api/raw?id=${encodeURIComponent(traceId)}&path=${encodeURIComponent(ref)}`,
+  );
   if (!res.headers.get("content-type")?.includes("application/json")) {
     throw new Error("this unbox-ai server is older than the viewer - restart it and reload");
   }

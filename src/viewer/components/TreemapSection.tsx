@@ -96,7 +96,13 @@ export function TreemapSection({ trace, generation }: TreemapSectionProps) {
             <span className="text-ta-grey-200">hover a block to inspect it · click to pin its full definition</span>
           )}
         </div>
-        {pinned && <DefinitionDialog leaf={pinned} onClose={() => setPinnedId(null)} />}
+        {pinned && (
+          <DefinitionDialog
+            traceId={trace.traceId}
+            leaf={pinned}
+            onClose={() => setPinnedId(null)}
+          />
+        )}
       </div>
     </Section>
   );

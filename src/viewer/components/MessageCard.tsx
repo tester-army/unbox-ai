@@ -45,6 +45,7 @@ export function MessageCard({ message }: { message: Message }) {
           </pre>
         ) : (
           <>
+            {message.reasoning !== undefined && <Thinking reasoning={message.reasoning} />}
             {message.text && (
               <p className="type-body-s whitespace-pre-wrap text-ta-grey-100">
                 {text}
@@ -63,6 +64,42 @@ export function MessageCard({ message }: { message: Message }) {
         )}
       </div>
     </article>
+  );
+}
+
+const THINKING_PREVIEW_CHARS = 160;
+
+/** Collapsed reasoning content; providers that withhold it still leave a trace. */
+function Thinking({ reasoning }: { reasoning: string }) {
+  const [open, setOpen] = useState(false);
+  if (!reasoning) {
+    return (
+      <p className="type-accent-s mb-2 text-ta-grey-200">
+        thinking · content withheld by provider
+      </p>
+    );
+  }
+  const overflows = reasoning.length > THINKING_PREVIEW_CHARS;
+  return (
+    <div className="mb-2 border border-ta-grey-400 bg-ta-grey-500 px-3 py-2">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="type-accent-s flex w-full cursor-pointer items-center gap-2 text-left text-ta-sand-300"
+      >
+        <span>{open ? "▾" : "▸"} thinking</span>
+        <span className="text-ta-grey-200">~{formatTokens(Math.round(reasoning.length / 4))} tok</span>
+      </button>
+      <p
+        className={cn(
+          "type-body-s mt-1 whitespace-pre-wrap italic text-ta-grey-200",
+          !open && "truncate",
+        )}
+      >
+        {open ? reasoning : reasoning.slice(0, THINKING_PREVIEW_CHARS)}
+        {!open && overflows && " ..."}
+      </p>
+    </div>
   );
 }
 

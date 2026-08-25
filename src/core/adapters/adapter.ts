@@ -15,4 +15,10 @@ export interface TraceAdapter<T = unknown> {
   name: string;
   detect(json: unknown): json is T;
   adapt(json: T): RawTrace;
+  /**
+   * Splits a source that holds several independent traces (e.g. one per
+   * devtools run) into parts, each fed to adapt(). Absent for single-trace
+   * formats. May return zero parts when the source is empty.
+   */
+  split?(json: T): T[];
 }

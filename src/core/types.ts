@@ -5,6 +5,10 @@ export interface RawTrace {
   name: string;
   total_tokens: { input: number; output: number };
   total_cost: number;
+  /** Adapter-provided: a generation is still running (live devtools). */
+  in_progress?: boolean;
+  /** Trace id of the run that spawned this one (nested agent runs). */
+  parent_trace_id?: string;
   events: RawEvent[];
 }
 
@@ -13,6 +17,8 @@ export interface RawEvent {
   name: string;
   model: string;
   provider: string;
+  /** Adapter-provided: started but not finished (live devtools). */
+  in_progress?: boolean;
   metrics: {
     latency: number;
     time_to_first_token?: number;
@@ -21,6 +27,8 @@ export interface RawEvent {
       output: number;
       /** Provider-reported cache-read tokens, when the trace has real numbers. */
       cache_read?: number;
+      /** Provider-reported reasoning share of output tokens. */
+      reasoning?: number;
     };
     cost: number;
   };
@@ -62,6 +70,10 @@ export interface NormalizedTrace {
   totalLatency: number;
   models: string[];
   segmentCount: number;
+  /** True while a generation of this trace is still running (live devtools). */
+  inProgress?: boolean;
+  /** Trace id of the run that spawned this one (nested agent runs). */
+  parentTraceId?: string;
   generations: Generation[];
 }
 
@@ -78,9 +90,13 @@ export interface Generation {
     timeToFirstToken?: number;
     inputTokens: number;
     outputTokens: number;
+    /** Provider-reported reasoning share of output tokens, when known. */
+    reasoningTokens?: number;
     cost: number;
   };
   toolCount: number;
+  /** True while the generation is still running (live devtools). */
+  inProgress?: boolean;
   /** Count of context messages carried over from previous generations. */
   carriedMessages: number;
   /** Tool results folded into their calls instead of shown as messages. */
@@ -98,6 +114,11 @@ export interface Message {
   index: number;
   role: MessageRole;
   text: string;
+  /**
+   * Reasoning/thinking content, split out of the message text. Empty string
+   * when the provider reported thinking but withheld its content.
+   */
+  reasoning?: string;
   toolCalls?: PairedToolCall[];
   /** Rough size estimate (chars/4), not scaled to reported totals. */
   approxTokens: number;
