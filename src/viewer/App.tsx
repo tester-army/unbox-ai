@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RunSummary } from "@core/collection";
 import type { NormalizedTrace } from "@core/types";
 import { GenerationDetail } from "@/components/GenerationDetail";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Header } from "@/components/Header";
 import { ReplayBar } from "@/components/ReplayBar";
 import { RunList } from "@/components/RunList";
@@ -149,31 +150,55 @@ function Loaded({
   );
 }
 
+const REGISTER_SNIPPET = `import { registerTelemetry } from "ai";
+import { DevToolsTelemetry } from "@ai-sdk/devtools";
+
+registerTelemetry(DevToolsTelemetry());`;
+
 function WaitingForCalls() {
   return (
     <div className="flex flex-1 items-center justify-center p-8">
       <div className="w-full max-w-xl border border-ta-grey-400 bg-ta-grey-450">
-        <div className="flex items-baseline gap-3 border-b border-ta-grey-400 px-5 py-3">
-          <span className="size-2 shrink-0 animate-pulse self-center rounded-full bg-ta-orange-300" />
+        <div className="flex items-center gap-3 border-b border-ta-grey-400 px-5 py-3">
+          <span className="size-2 shrink-0 animate-pulse rounded-full bg-ta-orange-300" />
           <p className="type-accent-m text-ta-sand-50">waiting for AI SDK calls</p>
-          <p className="type-accent-s ml-auto text-ta-grey-200">listening on {location.host}</p>
+          <p className="type-accent-s ml-auto text-ta-grey-300">{location.host}</p>
         </div>
-        <div className="px-5 py-4">
-          <p className="type-body-m text-ta-grey-100">
-            Register the devtools telemetry in your app - every generateText / streamText call
-            streams in here live.
-          </p>
-          <pre className="type-body-s mt-4 overflow-x-auto border border-ta-grey-400 bg-ta-grey-500 px-4 py-3 font-(family-name:--font-dm-mono) leading-relaxed text-ta-sand-50">
-            {`import { registerTelemetry } from "ai";
-import { DevToolsTelemetry } from "@ai-sdk/devtools";
-
-registerTelemetry(DevToolsTelemetry());`}
-          </pre>
-          <p className="type-accent-s mt-4 text-ta-grey-200">
-            npm i @ai-sdk/devtools · runs persist in .devtools/generations.json
+        <div className="flex flex-col gap-5 px-5 py-5">
+          <SetupStep n={1} label="install">
+            <Snippet text="npm install @ai-sdk/devtools" />
+          </SetupStep>
+          <SetupStep n={2} label="register once at startup">
+            <Snippet text={REGISTER_SNIPPET} />
+          </SetupStep>
+          <p className="type-body-s text-ta-grey-200">
+            Every generateText / streamText call then appears here live. Runs persist in{" "}
+            <span className="font-(family-name:--font-dm-mono)">.devtools/generations.json</span>.
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SetupStep({ n, label, children }: { n: number; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="type-accent-s text-ta-grey-200">
+        <span className="text-ta-orange-300">{n}</span> · {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function Snippet({ text }: { text: string }) {
+  return (
+    <div className="flex items-start gap-2 border border-ta-grey-400 bg-ta-grey-500 py-2 pl-4 pr-2">
+      <pre className="type-body-s min-w-0 flex-1 overflow-x-auto py-1 font-(family-name:--font-dm-mono) leading-relaxed text-ta-grey-100">
+        {text}
+      </pre>
+      <CopyButton className="border-none" text={text} />
     </div>
   );
 }
