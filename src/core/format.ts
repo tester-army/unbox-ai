@@ -7,8 +7,9 @@ export function formatCompact(n: number): string {
 /** Formats a token count compactly: 310334 -> "310.3k". */
 export const formatTokens = formatCompact;
 
+/** "-" for zero: traces without price data (AI SDK devtools) report 0. */
 export function formatCost(cost: number): string {
-  return `$${cost.toFixed(4)}`;
+  return cost > 0 ? `$${cost.toFixed(4)}` : "-";
 }
 
 export function formatSeconds(seconds: number): string {

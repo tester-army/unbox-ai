@@ -45,6 +45,7 @@ export function normalizeTrace(raw: RawTrace): NormalizedTrace {
     totalLatency: sum(generations.map((g) => g.metrics.latency)),
     models: [...new Set(generations.map((g) => g.model))],
     segmentCount,
+    ...(raw.in_progress ? { inProgress: true } : {}),
     generations,
   };
 }
@@ -260,9 +261,13 @@ function normalizeEvent(
         : {}),
       inputTokens: event.metrics.tokens.input,
       outputTokens: event.metrics.tokens.output,
+      ...(event.metrics.tokens.reasoning !== undefined
+        ? { reasoningTokens: event.metrics.tokens.reasoning }
+        : {}),
       cost: event.metrics.cost,
     },
     toolCount: event.available_tools?.length ?? 0,
+    ...(event.in_progress ? { inProgress: true } : {}),
     carriedMessages: carried,
     foldedResults: rawNew - newMessages.length,
     newMessages,
@@ -329,7 +334,7 @@ function normalizeMessage(
   segment: number,
   pairing: Pairing,
 ): Message {
-  const text = contentToText(raw.content);
+  const { text, reasoning } = splitReasoning(raw.content);
   const toolCalls = raw.tool_calls?.map((call): PairedToolCall => {
     const key = `${segment}:${call.id}`;
     const result = pairing.results.get(key);
@@ -360,8 +365,31 @@ function normalizeMessage(
     index,
     role: normalizeRole(raw.role),
     text,
+    ...(reasoning !== undefined ? { reasoning } : {}),
     ...(toolCalls?.length ? { toolCalls } : {}),
     approxTokens: Math.round(messageChars(raw) / CHARS_PER_TOKEN),
+  };
+}
+
+/**
+ * Separates reasoning/thinking parts from the rest of a message's content.
+ * reasoning is defined (possibly "") only when such parts exist - providers
+ * that withhold thinking send parts with empty text.
+ */
+function splitReasoning(content: unknown): { text: string; reasoning?: string } {
+  if (!Array.isArray(content)) return { text: contentToText(content) };
+  const isReasoning = (part: unknown): part is { text?: string; thinking?: string } => {
+    const type = (part as { type?: unknown })?.type;
+    return type === "reasoning" || type === "thinking";
+  };
+  const parts = content.filter(isReasoning);
+  if (parts.length === 0) return { text: contentToText(content) };
+  return {
+    text: contentToText(content.filter((part) => !isReasoning(part))),
+    reasoning: parts
+      .map((part) => part.text ?? part.thinking ?? "")
+      .join("\n")
+      .trim(),
   };
 }
 

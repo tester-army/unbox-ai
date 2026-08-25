@@ -1,5 +1,6 @@
 import type { RawTrace } from "../types";
 import type { TraceAdapter } from "./adapter";
+import { aiSdkDevtoolsAdapter } from "./ai-sdk-devtools";
 import { gatewayAdapter } from "./gateway";
 import { opencodeAdapter } from "./opencode";
 
@@ -8,6 +9,7 @@ export type { TraceAdapter } from "./adapter";
 /** Most specific detection first; gateway last - it is the internal shape itself. */
 export const ADAPTERS: TraceAdapter[] = [
   opencodeAdapter as TraceAdapter,
+  aiSdkDevtoolsAdapter as TraceAdapter,
   gatewayAdapter as TraceAdapter,
 ];
 
