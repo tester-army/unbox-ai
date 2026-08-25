@@ -82,11 +82,11 @@ npx unbox-ai devtools
 
 Every `generateText` / `streamText` call streams into the viewer live - token
 treemap, cache-hit attribution, latency waterfall, and diffed messages update
-as your agent runs. Each root run gets its own entry in the sidebar run list
-(the viewer follows the newest run until you pin an older one); nested agent
-runs (tools that call the AI SDK again) show up as segments inside their run.
-The static commands work on the database file too:
-`unbox-ai summary .devtools/generations.json`.
+as your agent runs. Every run gets its own entry in the sidebar run list, with
+nested agent runs (tools that call the AI SDK again) indented under their
+parent; the viewer follows the newest run until you pin an older one, and
+concurrent streams stay individually visible. The static commands work on the
+database file too: `unbox-ai summary .devtools/generations.json`.
 
 The run list is not devtools-only - `unbox-ai view a.trace.json b.trace.json`
 opens several trace files (any mix of formats) as one run list.
