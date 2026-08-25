@@ -4,6 +4,7 @@
 
 <p align="center">
   <a href="#quickstart"><strong>Quickstart</strong></a> |
+  <a href="#ai-sdk-devtools-live"><strong>AI SDK DevTools</strong></a> |
   <a href="#the-viewer"><strong>Viewer</strong></a> |
   <a href="#for-agents"><strong>For Agents</strong></a> |
   <a href="#skill-installation"><strong>Skills</strong></a> |
@@ -50,14 +51,45 @@ npx unbox-ai trace.json
 ```
 
 That's it. A local server starts and your browser opens the viewer. Works with
-gateway exports and opencode session exports (see
+gateway exports, opencode session exports, and AI SDK devtools databases (see
 [Trace Formats](#trace-formats)).
 
 ```
 --json        machine-readable output
---port <n>    server port (default 4177)
+--port <n>    server port (view default 4177, devtools default 4983)
 --no-open     start the server without opening a browser
 ```
+
+## AI SDK DevTools (live)
+
+`unbox-ai devtools` is a drop-in replacement for the
+[`@ai-sdk/devtools`](https://www.npmjs.com/package/@ai-sdk/devtools) viewer:
+same capture setup, this viewer instead. Instrument your app exactly as the
+AI SDK documents it:
+
+```ts
+import { registerTelemetry } from "ai";
+import { DevToolsTelemetry } from "@ai-sdk/devtools";
+
+registerTelemetry(DevToolsTelemetry());
+```
+
+Then, instead of `npx @ai-sdk/devtools`, run:
+
+```bash
+npx unbox-ai devtools
+```
+
+Every `generateText` / `streamText` call streams into the viewer live - token
+treemap, cache-hit attribution, latency waterfall, and diffed messages update
+as your agent runs. Each root run gets its own entry in the sidebar run list
+(the viewer follows the newest run until you pin an older one); nested agent
+runs (tools that call the AI SDK again) show up as segments inside their run.
+The static commands work on the database file too:
+`unbox-ai summary .devtools/generations.json`.
+
+The run list is not devtools-only - `unbox-ai view a.trace.json b.trace.json`
+opens several trace files (any mix of formats) as one run list.
 
 ## The Viewer
 
@@ -76,6 +108,7 @@ per-generation totals) and labeled as such.
 The same binary is a bounded, read-only trace explorer - safe to allowlist:
 
 ```bash
+unbox-ai runs trace.json             # multi-run sources: one line per run, then scope with --run
 unbox-ai summary trace.json          # totals + one line per generation
 unbox-ai events trace.json           # table: tokens, latency, cost, tool calls
 unbox-ai event trace.json 5          # one generation, new messages only
@@ -120,6 +153,12 @@ pointers to fetch full values.
   automatically. Real cache read/write tokens and per-tool execution times
   carry over. Note: opencode exports omit the system prompt and tool
   definitions, so token attribution assigns their weight to the conversation.
+- **AI SDK devtools databases** (`{runs[], steps[]}`,
+  `.devtools/generations.json` written by `@ai-sdk/devtools`) - adapted
+  automatically, and served live by `unbox-ai devtools`. Cache-read tokens
+  carry over; the AI SDK reports no cost or TTFT, so those show as zero/absent.
+  Tool definitions arrive without their JSON schemas, so the treemap's tools
+  group reflects names and descriptions only.
 
 There is no universal AI-trace standard yet; the closest are the OpenTelemetry
 GenAI semantic conventions, OpenInference, and OpenLLMetry (all span-based).
