@@ -13,39 +13,55 @@ function devTraceApi(): Plugin {
   return {
     name: "unbox-dev-trace-api",
     async configureServer(server) {
-      const { normalizeTrace } = await import("./src/core/normalize");
-      const { parseTrace } = await import("./src/core/adapters");
+      const { parseCollection, runSummaries } = await import("./src/core/collection");
       const { resolvePath } = await import("./src/core/path");
+      const loadItems = () => {
+        const tracePath = process.env.UNBOX_TRACE;
+        if (!tracePath) throw new Error("Set UNBOX_TRACE=<file> to serve a trace in dev");
+        return parseCollection(JSON.parse(readFileSync(tracePath, "utf8"))).items;
+      };
+      const pick = (req: { url?: string }) => {
+        const url = new URL(req.url ?? "", "http://localhost");
+        const items = loadItems();
+        const id = url.searchParams.get("id");
+        const item =
+          id === null ? items.at(-1) : items.find((it) => it.trace.traceId === id);
+        return { url, item };
+      };
+      const send = (res: import("node:http").ServerResponse, status: number, body: unknown) => {
+        res.statusCode = status;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify(body));
+      };
       server.middlewares.use("/api/raw", (req, res) => {
         try {
-          const raw = parseTrace(JSON.parse(readFileSync(process.env.UNBOX_TRACE ?? "", "utf8")));
-          const path = new URL(req.url ?? "", "http://localhost").searchParams.get("path") ?? "";
-          const value = resolvePath(raw, path);
-          res.statusCode = value === undefined ? 404 : 200;
-          res.setHeader("content-type", "application/json");
-          res.end(JSON.stringify(value === undefined ? { error: "nothing at path" } : { value }));
+          const { url, item } = pick(req);
+          const value = item && resolvePath(item.raw, url.searchParams.get("path") ?? "");
+          if (value === undefined) return send(res, 404, { error: "nothing at path" });
+          send(res, 200, { value });
         } catch (error) {
-          res.statusCode = 500;
-          res.end(JSON.stringify({ error: String(error) }));
+          send(res, 500, { error: String(error) });
         }
       });
-      server.middlewares.use("/api/trace", (_req, res) => {
-        const sendError = (message: string) => {
-          res.statusCode = 500;
-          res.setHeader("content-type", "application/json");
-          res.end(JSON.stringify({ error: message }));
-        };
-        const tracePath = process.env.UNBOX_TRACE;
-        if (!tracePath) {
-          sendError("Set UNBOX_TRACE=<file> to serve a trace in dev");
-          return;
-        }
+      // static stand-in for the CLI's SSE endpoint so EventSource connects in dev
+      server.middlewares.use("/api/events", (_req, res) => {
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
+        res.write('event: hello\ndata: {"live":false}\n\n');
+      });
+      server.middlewares.use("/api/traces", (_req, res) => {
         try {
-          const raw = parseTrace(JSON.parse(readFileSync(tracePath, "utf8")));
-          res.setHeader("content-type", "application/json");
-          res.end(JSON.stringify(normalizeTrace(raw)));
+          send(res, 200, runSummaries(loadItems()));
         } catch (error) {
-          sendError(error instanceof Error ? error.message : String(error));
+          send(res, 500, { error: error instanceof Error ? error.message : String(error) });
+        }
+      });
+      server.middlewares.use("/api/trace", (req, res) => {
+        try {
+          const { item } = pick(req);
+          if (!item) return send(res, 404, { error: "no traces yet" });
+          send(res, 200, item.trace);
+        } catch (error) {
+          send(res, 500, { error: error instanceof Error ? error.message : String(error) });
         }
       });
     },
