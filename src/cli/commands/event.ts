@@ -48,6 +48,13 @@ export function event(loaded: LoadedTrace, index: number, json: boolean): void {
 
 function printMessage(message: Message, genIndex: number): void {
   console.log(`--- [${message.index}] ${message.role} (~${formatTokens(message.approxTokens)} tok)`);
+  if (message.reasoning !== undefined) {
+    console.log(
+      message.reasoning
+        ? `  thinking: ${truncate(message.reasoning.replace(/\s+/g, " "), contentPointer(genIndex, message.index), 200)}`
+        : "  thinking: (content withheld by provider)",
+    );
+  }
   if (message.text) console.log(truncate(message.text, contentPointer(genIndex, message.index)));
   message.toolCalls?.forEach((call, callIndex) => {
     console.log(

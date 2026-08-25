@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import { resolve } from "node:path";
 import type { MessageRole } from "../core/types";
 import { event } from "./commands/event";
 import { events } from "./commands/events";
@@ -6,15 +7,20 @@ import { get } from "./commands/get";
 import { messages } from "./commands/messages";
 import { summary } from "./commands/summary";
 import { tools } from "./commands/tools";
-import { fail, loadTrace } from "./load";
+import { runs } from "./commands/runs";
+import { createLiveSource } from "./live";
+import { fail, loadCollectionFiles, loadRun, loadTrace } from "./load";
 import { openBrowser } from "./open-browser";
-import { startServer } from "./server";
+import { setTraceRef } from "./output";
+import { startServer, staticSource } from "./server";
 
 const HELP = `unbox-ai - visualize and explore AI traces
 
 Usage:
   unbox-ai <trace.json>                  open the visualization (summary when piped)
-  unbox-ai view <trace.json>             open the visualization
+  unbox-ai view <trace.json> [more...]   open the visualization (several files = one run list)
+  unbox-ai devtools                      live viewer for AI SDK apps (@ai-sdk/devtools drop-in)
+  unbox-ai runs <trace.json>             one line per independent run (devtools databases)
   unbox-ai summary <trace.json>          totals + one line per generation
   unbox-ai events <trace.json>           generation table (tokens, latency, cost, tool calls)
   unbox-ai event <trace.json> <idx>      one generation: metrics, token split, new messages
@@ -24,7 +30,8 @@ Usage:
 
 Options:
   --json          machine-readable output, unbounded (summary, events, event, messages)
-  --port <n>      server port for view (default 4177)
+  --run <n|id>    scope a text command to one run of a multi-run source (see: runs)
+  --port <n>      server port (view default 4177; devtools default 4983)
   --no-open       start the server without opening a browser
   --role <r>      filter: system | user | assistant | tool-result | unknown
   --event <n>     filter: only messages of generation n
@@ -35,7 +42,7 @@ Plain output is bounded; truncations include the exact "get" invocation
 that returns the rest. --json is complete and therefore unbounded.
 All commands are read-only - safe for agents to run freely.`;
 
-const COMMANDS = new Set(["view", "summary", "events", "event", "tools", "messages", "get"]);
+const COMMANDS = new Set(["view", "runs", "summary", "events", "event", "tools", "messages", "get"]);
 
 const ROLES: MessageRole[] = ["system", "user", "assistant", "tool-result", "unknown"];
 
@@ -43,7 +50,8 @@ function main(): void {
   const { values, positionals } = parseArgs({
     options: {
       json: { type: "boolean", default: false },
-      port: { type: "string", default: "4177" },
+      run: { type: "string" },
+      port: { type: "string" },
       "no-open": { type: "boolean", default: false },
       all: { type: "boolean", default: false },
       role: { type: "string" },
@@ -66,18 +74,32 @@ function main(): void {
   }
 
   const [first, ...rest] = positionals;
+  if (first === "devtools") {
+    devtools(values).catch((error) =>
+      fail(error instanceof Error ? error.message : String(error)),
+    );
+    return;
+  }
   const command = COMMANDS.has(first!) ? first! : defaultCommand();
-  const [tracePath, arg] = COMMANDS.has(first!) ? rest : [first, ...rest];
+  const paths = COMMANDS.has(first!) ? rest : [first!, ...rest];
+  const [tracePath, arg] = paths;
   if (!tracePath) fail("Missing trace file. See: unbox-ai --help");
 
-  const loaded = loadTrace(tracePath);
+  if (command === "view") {
+    view(paths, values).catch((error) =>
+      fail(error instanceof Error ? error.message : String(error)),
+    );
+    return;
+  }
+  if (command === "runs") {
+    runs(loadCollectionFiles(paths), values.json);
+    return;
+  }
+
+  if (values.run !== undefined) setTraceRef(`<trace> --run ${values.run}`);
+  const loaded = values.run !== undefined ? loadRun(tracePath, values.run) : loadTrace(tracePath);
 
   switch (command) {
-    case "view":
-      view(loaded, values).catch((error) =>
-        fail(error instanceof Error ? error.message : String(error)),
-      );
-      return;
     case "summary":
       summary(loaded, values.json);
       return;
@@ -115,12 +137,53 @@ function defaultCommand(): string {
 }
 
 async function view(
-  loaded: ReturnType<typeof loadTrace>,
-  values: { port: string; "no-open": boolean },
+  paths: string[],
+  values: { port?: string; "no-open": boolean },
 ): Promise<void> {
-  const { port } = await startServer(loaded.trace, loaded.raw, parsePort(values.port));
+  const items = loadCollectionFiles(paths);
+  if (items.length === 0) fail("No runs found in the given files.");
+  const { port } = await startServer(staticSource(items), parsePort(values.port ?? "4177"));
   const url = `http://localhost:${port}`;
-  console.log(`unbox-ai: serving ${loaded.path} at ${url} (ctrl-c to stop)`);
+  const label = paths.length === 1 ? paths[0] : `${paths.length} files`;
+  const runs = items.length > 1 ? ` (${items.length} runs)` : "";
+  console.log(`unbox-ai: serving ${label}${runs} at ${url} (ctrl-c to stop)`);
+  if (!values["no-open"]) openBrowser(url);
+}
+
+/**
+ * Live devtools mode: a drop-in replacement for the @ai-sdk/devtools viewer.
+ * The DevToolsTelemetry integration in the user's app writes
+ * .devtools/generations.json and POSTs /api/notify after every step; this
+ * server re-reads the file on each ping and pushes updates to the viewer.
+ * The port must be exact - the app targets it directly (AI_SDK_DEVTOOLS_PORT).
+ */
+async function devtools(values: { port?: string; "no-open": boolean }): Promise<void> {
+  const dbPath = resolve(process.cwd(), ".devtools/generations.json");
+  const source = createLiveSource(dbPath);
+  const hasData = source.reload();
+  const preferred = parsePort(values.port ?? process.env.AI_SDK_DEVTOOLS_PORT ?? "4983");
+  const { port } = await startServer(source, preferred, { exactPort: true }).catch((error) => {
+    if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
+      fail(
+        `port ${preferred} is in use - is @ai-sdk/devtools or another unbox-ai devtools running?\n` +
+          `Pick another port with --port <n> and set AI_SDK_DEVTOOLS_PORT=<n> in your app.`,
+      );
+    }
+    throw error;
+  });
+  const url = `http://localhost:${port}`;
+  console.log(`unbox-ai: devtools viewer at ${url} (ctrl-c to stop)`);
+  if (hasData) {
+    console.log(`unbox-ai: loaded ${dbPath}`);
+  } else {
+    console.log(`unbox-ai: waiting for AI SDK calls. In your app:
+
+  import { registerTelemetry } from "ai";
+  import { DevToolsTelemetry } from "@ai-sdk/devtools";
+
+  registerTelemetry(DevToolsTelemetry());
+`);
+  }
   if (!values["no-open"]) openBrowser(url);
 }
 

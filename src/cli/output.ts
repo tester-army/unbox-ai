@@ -1,5 +1,17 @@
 export { formatCallNames, formatCost, formatSeconds, formatTokens } from "../core/format";
 
+let traceRef = "<trace>";
+
+/** Set once when --run scopes the process, so printed hints stay copy-pasteable. */
+export function setTraceRef(ref: string): void {
+  traceRef = ref;
+}
+
+/** How printed hints refer to the trace argument, e.g. "<trace> --run 2". */
+export function getTraceRef(): string {
+  return traceRef;
+}
+
 /** Canonical `get` pointer to a message's content. */
 export function contentPointer(genIndex: number, messageIndex: number): string {
   return `events[${genIndex}].messages[${messageIndex}].content`;
@@ -26,7 +38,7 @@ export function truncate(
 ): string {
   if (text.length <= max) return text;
   const rest = Math.max(sourceLength - max, 1);
-  const hint = pointer ? ` - run: unbox-ai get <trace> '${pointer}'` : "";
+  const hint = pointer ? ` - run: unbox-ai get ${traceRef} '${pointer}'` : "";
   return `${text.slice(0, max)}\n[... ${rest} more chars${hint}]`;
 }
 

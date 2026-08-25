@@ -1,7 +1,7 @@
 import { formatCompact, formatMs } from "../../core/format";
 import { allToolCalls } from "../../core/normalize";
 import type { LoadedTrace } from "../load";
-import { printJson, table, truncate } from "../output";
+import { getTraceRef, printJson, table, truncate } from "../output";
 
 const ARGS_PREVIEW_CHARS = 60;
 
@@ -30,7 +30,7 @@ export function tools(loaded: LoadedTrace, json: boolean, all: boolean): void {
       truncate(JSON.stringify(call.args) ?? "", undefined, ARGS_PREVIEW_CHARS).replace(/\n.*/s, "..."),
     ]);
     console.log(table(["gen", "name", "status", "time", "size", "args"], rows));
-    console.log("\ndrill in: unbox-ai event <trace> <gen>");
+    console.log(`\ndrill in: unbox-ai event ${getTraceRef()} <gen>`);
     return;
   }
 
@@ -56,7 +56,7 @@ export function tools(loaded: LoadedTrace, json: boolean, all: boolean): void {
       formatCompact(u.totalSize),
     ]);
   console.log(table(["tool", "calls", "failed", "time", "output"], rows));
-  console.log(`\n${calls.length} calls across ${byName.size} tools · every call: unbox-ai tools <trace> --all`);
+  console.log(`\n${calls.length} calls across ${byName.size} tools · every call: unbox-ai tools ${getTraceRef()} --all`);
 }
 
 function status(success: boolean | undefined, hasResult: boolean): string {

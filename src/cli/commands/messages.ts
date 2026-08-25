@@ -1,6 +1,6 @@
 import type { Message, MessageRole } from "../../core/types";
 import type { LoadedTrace } from "../load";
-import { contentPointer, formatTokens, printJson, truncate } from "../output";
+import { contentPointer, formatTokens, getTraceRef, printJson, truncate } from "../output";
 
 export interface MessagesFilter {
   role?: MessageRole;
@@ -38,7 +38,7 @@ export function messages(loaded: LoadedTrace, filter: MessagesFilter, json: bool
     const calls = hit.toolCalls?.map((c) => c.name).join(",");
     const body =
       hit.match && hit.match.where !== "text"
-        ? `matched in ${hit.match.where}: "...${hit.match.snippet}..." - drill in: unbox-ai event <trace> ${hit.gen}`
+        ? `matched in ${hit.match.where}: "...${hit.match.snippet}..." - drill in: unbox-ai event ${getTraceRef()} ${hit.gen}`
         : hit.text
           ? truncate(
               hit.text.replace(/\s+/g, " "),
@@ -46,7 +46,7 @@ export function messages(loaded: LoadedTrace, filter: MessagesFilter, json: bool
               240,
               hit.text.length,
             )
-          : `tool_calls: ${calls} - drill in: unbox-ai event <trace> ${hit.gen}`;
+          : `tool_calls: ${calls} - drill in: unbox-ai event ${getTraceRef()} ${hit.gen}`;
     console.log(
       `[gen ${hit.gen} msg ${hit.index}] ${hit.role} (~${formatTokens(hit.approxTokens)} tok): ${body}`,
     );
@@ -62,10 +62,13 @@ interface Match {
   snippet: string;
 }
 
-/** Locates the first pattern match in a message: body text, call args, or a result. */
+/** Locates the first pattern match in a message: body text, reasoning, call args, or a result. */
 function findMatch(m: Message, pattern: RegExp | undefined): Match | null {
   if (!pattern) return { where: "text", snippet: "" };
   if (pattern.test(m.text)) return { where: "text", snippet: "" };
+  if (m.reasoning && pattern.test(m.reasoning)) {
+    return { where: "thinking", snippet: snippet(m.reasoning, pattern) };
+  }
   for (const call of m.toolCalls ?? []) {
     const args = JSON.stringify(call.args);
     if (pattern.test(args)) return { where: `${call.name} args`, snippet: snippet(args, pattern) };
