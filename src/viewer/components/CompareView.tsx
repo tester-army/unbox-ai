@@ -136,70 +136,80 @@ function MetricsGrid({ comparison }: { comparison: TraceComparison }) {
           : `totals · A: ${models.a.join(", ")} · B: ${models.b.join(", ")}`
       }
     >
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
-        {metrics.map((m) => (
-          <MetricTile key={m.key} metric={m} />
-        ))}
-      </div>
+      <DeltaChart metrics={metrics} />
     </Section>
   );
 }
 
-/** One headline metric as a stat tile: name, prominent delta, A/B bars and values. */
-function MetricTile({ metric }: { metric: ComparedMetric }) {
-  const delta = metricDelta(metric);
+/**
+ * Diverging bar per metric: B relative to A around a shared zero line, all
+ * rows on one scale (the largest |delta|, capped at 100%) so the metric that
+ * moved most sticks out and near-equal runs read as bars hugging zero.
+ * Position encodes direction; the printed delta is the exact value.
+ */
+function DeltaChart({ metrics }: { metrics: ComparedMetric[] }) {
+  const rows = metrics.map((m) => ({ m, rel: relativeDelta(m) }));
+  const scale = Math.max(...rows.map((row) => Math.abs(row.rel)), 0.01);
   return (
-    <div className="flex flex-col gap-2.5 border border-ta-grey-400 bg-ta-grey-450/40 px-4 py-3">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="type-accent-s text-ta-grey-200">{metric.key}</span>
-        <span
-          className={cn("type-accent-m", delta === "=" ? "text-ta-grey-300" : "text-ta-sand-50")}
-        >
-          {delta}
-        </span>
-      </div>
-      <MetricBars metric={metric} />
-      <div className="type-accent-s flex justify-between gap-3 text-ta-grey-100">
-        <span>
-          <SeriesChip className="bg-ta-grey-300" /> A {metricValue(metric.kind, metric.a)}
-        </span>
-        <span>
-          <SeriesChip className="bg-ta-orange-300" /> B {metricValue(metric.kind, metric.b)}
-        </span>
+    <div className="border border-ta-grey-400 px-5 py-4">
+      <div className="type-accent-s grid grid-cols-[minmax(7rem,auto)_minmax(4.5rem,auto)_1fr_minmax(4.5rem,auto)_minmax(7rem,auto)] items-center gap-x-5 gap-y-2">
+        <span className="text-ta-grey-300">metric</span>
+        <span className="text-right text-ta-grey-300">A</span>
+        <span className="text-center text-ta-grey-300">B vs A · scale ±{pct(scale)}</span>
+        <span className="text-ta-grey-300">B</span>
+        <span className="text-right text-ta-grey-300">delta</span>
+        {rows.map(({ m, rel }) => {
+          const delta = metricDelta(m);
+          return (
+            <div key={m.key} className="contents">
+              <span className="text-ta-grey-200">{m.key}</span>
+              <span className="text-right text-ta-grey-100">{metricValue(m.kind, m.a)}</span>
+              <DeltaBar rel={rel} scale={scale} />
+              <span className="text-ta-grey-100">{metricValue(m.kind, m.b)}</span>
+              <span
+                className={cn("text-right", delta === "=" ? "text-ta-grey-300" : "text-ta-sand-50")}
+              >
+                {delta}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
-}
-
-/** Ties a bar's series color to its value column. */
-function SeriesChip({ className }: { className: string }) {
-  return <span aria-hidden className={cn("mr-1 inline-block size-1.5 align-middle", className)} />;
 }
 
 /**
- * Paired A/B bars per metric. Each row scales to its own max - tokens,
- * dollars, and seconds share no axis - except shares, which scale to 100%
- * so the bar length is the honest ratio. A is the neutral reference, B the
- * accent; identity is also carried by position and the labeled columns.
+ * B's change relative to A: (b-a)/a for magnitudes (capped at +-100%, the
+ * printed delta carries the exact number), plain point difference for
+ * shares, +100% when A is zero and B is not.
  */
-function MetricBars({ metric }: { metric: ComparedMetric }) {
-  const scale = metric.kind === "share" ? 1 : Math.max(metric.a, metric.b);
-  const width = (v: number) => (scale <= 0 || v <= 0 ? "0%" : `${Math.max((v / scale) * 100, 2)}%`);
-  return (
-    <div
-      className="flex min-w-16 flex-col gap-0.5"
-      title={`A ${metricValue(metric.kind, metric.a)} · B ${metricValue(metric.kind, metric.b)}`}
-    >
-      <Bar className="bg-ta-grey-300" width={width(metric.a)} />
-      <Bar className="bg-ta-orange-300" width={width(metric.b)} />
-    </div>
-  );
+function relativeDelta(metric: ComparedMetric): number {
+  if (metric.kind === "share") return metric.b - metric.a;
+  if (metric.a > 0) return Math.max(Math.min((metric.b - metric.a) / metric.a, 1), -1);
+  return metric.b > 0 ? 1 : 0;
 }
 
-function Bar({ className, width }: { className: string; width: string }) {
+function pct(fraction: number): string {
+  const points = fraction * 100;
+  return `${points >= 10 ? Math.round(points) : Math.round(points * 10) / 10}%`;
+}
+
+function DeltaBar({ rel, scale }: { rel: number; scale: number }) {
+  const half = Math.min((Math.abs(rel) / scale) * 50, 50);
+  const width = rel === 0 ? 0 : Math.max(half, 0.75);
   return (
-    <div className="h-[5px] w-full bg-ta-grey-450">
-      <div className={cn("h-full", className)} style={{ width }} />
+    <div className="relative h-3 w-full bg-ta-grey-450/60">
+      <span aria-hidden className="absolute inset-y-0 left-1/2 w-px bg-ta-grey-300" />
+      {width > 0 && (
+        <span
+          aria-hidden
+          className="absolute inset-y-[3px] bg-ta-orange-300"
+          style={
+            rel > 0 ? { left: "50%", width: `${width}%` } : { right: "50%", width: `${width}%` }
+          }
+        />
+      )}
     </div>
   );
 }
