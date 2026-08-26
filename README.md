@@ -198,6 +198,10 @@ node dist/cli/index.js summary path/to/trace.json
 npm run check                                 # lint (biome) + typecheck + tests (vitest)
 ```
 
+## Releasing
+
+`npm run release` (from main, clean tree) runs [release-it](https://github.com/release-it/release-it): version inferred from conventional commits, CHANGELOG.md updated, git tag + GitHub release + npm publish. Needs `GITHUB_TOKEN` (e.g. `export GITHUB_TOKEN=$(gh auth token)`) and `npm login`. Preview with `npm run release -- --dry-run --ci`.
+
 ## License
 
 MIT
