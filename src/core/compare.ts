@@ -32,29 +32,103 @@ export type PromptDiff =
       lines: DiffLine[];
     };
 
+/** One tool whose definition differs between the runs. */
+export interface ToolChange {
+  name: string;
+  /** Which parts of the definition differ. */
+  parts: ("description" | "schema")[];
+  /** Line diff of the rendered definition; absent when too large to diff. */
+  lines?: DiffLine[];
+}
+
 export interface ToolsDiff {
   added: string[];
   removed: string[];
-  /** Same name, different description or input schema. */
-  changed: string[];
+  changed: ToolChange[];
   unchanged: number;
+}
+
+/** One tool's call activity in both runs. */
+export interface ToolUsageDelta {
+  name: string;
+  a: ToolUsageSide;
+  b: ToolUsageSide;
+}
+
+export interface ToolUsageSide {
+  calls: number;
+  failures: number;
+  seconds: number;
 }
 
 export interface TraceComparison {
   models: { a: string[]; b: string[] };
   metrics: ComparedMetric[];
+  /** The runs' first user messages - differing tasks make deltas misleading. */
+  task: PromptDiff;
   systemPrompt: PromptDiff;
   tools: ToolsDiff;
+  /** Per-tool call activity, biggest call-count change first. */
+  toolUsage: ToolUsageDelta[];
 }
 
-/** Diffs two traces: headline metric deltas plus system prompt and tool-set changes. */
+/** Diffs two traces: headline metric deltas plus task, prompt, and tool changes. */
 export function compareTraces(a: ComparableTrace, b: ComparableTrace): TraceComparison {
   return {
     models: { a: a.trace.models, b: b.trace.models },
     metrics: compareMetrics(a.trace, b.trace),
+    task: comparePrompts(taskPrompt(a.trace), taskPrompt(b.trace)),
     systemPrompt: comparePrompts(systemPrompt(a.trace), systemPrompt(b.trace)),
     tools: compareTools(a.tools, b.tools),
+    toolUsage: compareToolUsage(a.trace, b.trace),
   };
+}
+
+/** The task given to the run: its first user message. */
+export function taskPrompt(trace: NormalizedTrace): string {
+  for (const gen of trace.generations) {
+    for (const message of gen.newMessages) {
+      if (message.role === "user") return message.text;
+    }
+  }
+  return "";
+}
+
+/** What the run concluded: its last assistant message that carries text. */
+export function finalText(trace: NormalizedTrace): string {
+  for (let i = trace.generations.length - 1; i >= 0; i--) {
+    const messages = trace.generations[i]!.newMessages;
+    for (let j = messages.length - 1; j >= 0; j--) {
+      const message = messages[j]!;
+      if (message.role === "assistant" && message.text.trim() !== "") return message.text;
+    }
+  }
+  return "";
+}
+
+function compareToolUsage(a: NormalizedTrace, b: NormalizedTrace): ToolUsageDelta[] {
+  const usage = (trace: NormalizedTrace) => {
+    const byName = new Map<string, ToolUsageSide>();
+    for (const call of allToolCalls(trace)) {
+      const entry = byName.get(call.name) ?? { calls: 0, failures: 0, seconds: 0 };
+      entry.calls++;
+      if (call.success === false) entry.failures++;
+      entry.seconds += (call.durationMs ?? 0) / 1000;
+      byName.set(call.name, entry);
+    }
+    return byName;
+  };
+  const [ua, ub] = [usage(a), usage(b)];
+  const none: ToolUsageSide = { calls: 0, failures: 0, seconds: 0 };
+  const names = [...new Set([...ua.keys(), ...ub.keys()])];
+  return names
+    .map((name) => ({ name, a: ua.get(name) ?? none, b: ub.get(name) ?? none }))
+    .sort(
+      (x, y) =>
+        Math.abs(y.b.calls - y.a.calls) - Math.abs(x.b.calls - x.a.calls) ||
+        y.a.calls + y.b.calls - (x.a.calls + x.b.calls) ||
+        x.name.localeCompare(y.name),
+    );
 }
 
 /** Everything the metric rows read, derived once per side. */
@@ -141,7 +215,7 @@ function compareMetrics(a: NormalizedTrace, b: NormalizedTrace): ComparedMetric[
 }
 
 /** The run's system prompt: system messages of the first generation. */
-function systemPrompt(trace: NormalizedTrace): string {
+export function systemPrompt(trace: NormalizedTrace): string {
   return (trace.generations[0]?.newMessages ?? [])
     .filter((message) => message.role === "system")
     .map((message) => message.text)
@@ -177,20 +251,46 @@ function compareTools(defsA: RawToolDef[], defsB: RawToolDef[]): ToolsDiff {
   const b = byName(defsB);
   const added: string[] = [];
   const removed: string[] = [];
-  const changed: string[] = [];
+  const changed: ToolChange[] = [];
   let unchanged = 0;
   for (const name of a.keys()) if (!b.has(name)) removed.push(name);
   for (const [name, def] of b) {
     const other = a.get(name);
-    if (other === undefined) added.push(name);
-    else if (defKey(other) !== defKey(def)) changed.push(name);
+    if (other === undefined) {
+      added.push(name);
+      continue;
+    }
+    const change = toolChange(other, def);
+    if (change !== undefined) changed.push(change);
     else unchanged++;
   }
   return { added, removed, changed, unchanged };
 }
 
-function defKey(def: RawToolDef): string {
-  return JSON.stringify({ description: def.description, inputSchema: def.inputSchema });
+/** What changed in a redefined tool, or undefined when the definitions match. */
+function toolChange(a: RawToolDef, b: RawToolDef): ToolChange | undefined {
+  const parts: ToolChange["parts"] = [];
+  if (a.description !== b.description) parts.push("description");
+  if (JSON.stringify(a.inputSchema) !== JSON.stringify(b.inputSchema)) parts.push("schema");
+  if (parts.length === 0) return undefined;
+  const lines = diffLines(defLines(a), defLines(b));
+  return { name: b.name, parts, ...(lines !== undefined ? { lines } : {}) };
+}
+
+/** The two diffable parts of a tool definition; absent parts render empty. */
+export function toolDefParts(def: RawToolDef): { description: string; schema: string } {
+  return {
+    description: def.description ?? "",
+    schema: def.inputSchema !== undefined ? JSON.stringify(def.inputSchema, null, 2) : "",
+  };
+}
+
+/** A definition as diffable lines: the description text, then the pretty schema. */
+function defLines(def: RawToolDef): string[] {
+  const parts = toolDefParts(def);
+  const lines = parts.description !== "" ? parts.description.split("\n") : [];
+  if (parts.schema !== "") lines.push(...parts.schema.split("\n"));
+  return lines;
 }
 
 export interface TrajectoryStep {

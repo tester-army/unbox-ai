@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectToolDefs, compareTraces, pairTrajectory } from "./compare";
+import { collectToolDefs, compareTraces, finalText, pairTrajectory, taskPrompt } from "./compare";
 import { diffLines } from "./diff";
 import { normalizeTrace } from "./normalize";
 import type { RawToolDef, RawTrace } from "./types";
@@ -127,12 +127,92 @@ describe("compareTraces", () => {
         rawTrace({ id: "b", tools: [tool("keep", "k"), tool("edit", "new"), tool("add", "a")] }),
       ),
     );
-    expect(comparison.tools).toEqual({
-      added: ["add"],
-      removed: ["drop"],
-      changed: ["edit"],
-      unchanged: 1,
+    expect(comparison.tools).toMatchObject({ added: ["add"], removed: ["drop"], unchanged: 1 });
+    expect(comparison.tools.changed).toEqual([
+      {
+        name: "edit",
+        parts: ["description"],
+        lines: [
+          { kind: "removed", text: "old" },
+          { kind: "added", text: "new" },
+        ],
+      },
+    ]);
+  });
+
+  it("diffs a changed tool schema line by line", () => {
+    const tool = (schema: unknown): RawToolDef => ({
+      type: "function",
+      name: "search",
+      description: "find things",
+      inputSchema: schema,
     });
+    const comparison = compareTraces(
+      side(rawTrace({ id: "a", tools: [tool({ q: "string" })] })),
+      side(rawTrace({ id: "b", tools: [tool({ q: "string", limit: "number" })] })),
+    );
+    const change = comparison.tools.changed[0]!;
+    expect(change.parts).toEqual(["schema"]);
+    expect(change.lines!.some((line) => line.kind === "added" && line.text.includes("limit"))).toBe(
+      true,
+    );
+    expect(change.lines!.some((line) => line.kind === "same" && line.text === "find things")).toBe(
+      true,
+    );
+  });
+});
+
+describe("compareTraces task and tool usage", () => {
+  it("flags differing tasks and passes identical ones", () => {
+    const same = compareTraces(side(rawTrace({ id: "a" })), side(rawTrace({ id: "b" })));
+    expect(same.task).toEqual({ kind: "identical", chars: 4 });
+
+    const other = rawTrace({ id: "b" });
+    other.events[0]!.messages = [{ role: "user", content: "a different task" }];
+    const diff = compareTraces(side(rawTrace({ id: "a" })), side(other));
+    expect(diff.task.kind).toBe("differs");
+  });
+
+  it("compares per-tool usage, biggest call change first", () => {
+    const withCalls = (id: string, names: string[]) => {
+      const raw = rawTrace({ id, events: names.length });
+      names.forEach((name, i) => {
+        raw.events[i]!.messages.push(
+          {
+            role: "assistant",
+            content: "",
+            tool_calls: [{ type: "function", id: `c${i}`, function: { name, arguments: {} } }],
+          },
+          { role: "tool", tool_call_id: `c${i}`, content: "done", duration_ms: 1000 },
+        );
+      });
+      return side(raw);
+    };
+    const comparison = compareTraces(
+      withCalls("a", ["search", "search", "click"]),
+      withCalls("b", ["click"]),
+    );
+    expect(comparison.toolUsage[0]).toMatchObject({
+      name: "search",
+      a: { calls: 2, seconds: 2 },
+      b: { calls: 0, seconds: 0 },
+    });
+    expect(comparison.toolUsage[1]).toMatchObject({
+      name: "click",
+      a: { calls: 1 },
+      b: { calls: 1 },
+    });
+  });
+});
+
+describe("taskPrompt and finalText", () => {
+  it("returns the first user message and the last assistant text", () => {
+    const raw = rawTrace({ id: "a", events: 2 });
+    raw.events[0]!.messages.push({ role: "assistant", content: "working on it" });
+    raw.events[1]!.messages.push({ role: "assistant", content: "all done" });
+    const trace = normalizeTrace(raw);
+    expect(taskPrompt(trace)).toBe("hi 0");
+    expect(finalText(trace)).toBe("all done");
   });
 });
 
