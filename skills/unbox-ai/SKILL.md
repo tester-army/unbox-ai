@@ -23,6 +23,7 @@ unbox-ai events <trace>         # table: tokens, latency, cost per generation
 unbox-ai event <trace> <idx>    # one generation: metrics + only its NEW messages
 unbox-ai messages <trace> --grep <q> [--role r] [--event n] [--limit n]
 unbox-ai get <trace> '<path>'   # exact raw value, e.g. events[3].messages[2].content
+unbox-ai compare <a> <b>        # A/B: metric deltas + system prompt / tool-set diff
 ```
 
 - `--json` on summary/events/event/tools/messages for machine-readable output
@@ -35,6 +36,10 @@ unbox-ai get <trace> '<path>'   # exact raw value, e.g. events[3].messages[2].co
   rest. Follow those pointers instead of guessing paths.
 - `--grep` accepts regex; invalid regex silently falls back to literal search.
 - `tools --all` lists every individual call with args.
+- `compare` answers "what changed between these two runs": token/cost/time
+  deltas, then a line diff of the system prompt and added/removed/changed
+  tools. Two runs of one file: `compare <trace> --run 0 --run 1` (first --run
+  scopes A, second B). Diff output is bounded; `--json` has the full diff.
 - `unbox-ai view <trace>` starts a localhost visualization - only offer this
   to the human; as an agent, stay on the read commands.
 
