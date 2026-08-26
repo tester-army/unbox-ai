@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { resolveAdapter } from "../core/adapters";
 import { parseCollection, type TraceCollectionItem } from "../core/collection";
 import { normalizeTrace } from "../core/normalize";
@@ -33,7 +34,12 @@ export function loadTrace(path: string): LoadedTrace {
  */
 export function loadCollectionFiles(paths: string[]): TraceCollectionItem[] {
   try {
-    return paths.flatMap((path) => parseCollection(readJson(path)).items);
+    return paths.flatMap((path) =>
+      parseCollection(readJson(path)).items.map((item) => ({
+        ...item,
+        sourcePath: resolve(path),
+      })),
+    );
   } catch (error) {
     fail(error instanceof Error ? error.message : String(error));
   }

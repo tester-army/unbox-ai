@@ -1,21 +1,26 @@
 import { formatCost, formatSeconds, formatTokens } from "@core/format";
 import type { NormalizedTrace } from "@core/types";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Hint } from "@/components/ui/hint";
 
 interface HeaderProps {
   trace: NormalizedTrace;
+  /** Shell command an agent runs to explore this run from the CLI. */
+  agentCommand?: string;
   /** Present in live devtools mode; empties the backing database. */
   onClear?: () => void;
 }
 
-export function Header({ trace, onClear }: HeaderProps) {
+export function Header({ trace, agentCommand, onClear }: HeaderProps) {
   return (
-    <header className="flex items-baseline gap-6 border-b border-ta-grey-400 px-6 py-4">
-      <h1 className="type-accent-m text-ta-orange-300">unbox-ai</h1>
+    <header className="flex items-baseline gap-6 overflow-hidden border-b border-ta-grey-400 px-6 py-4">
+      <h1 className="type-accent-m shrink-0 text-ta-orange-300">unbox-ai</h1>
       <span className="type-body-m min-w-0 truncate text-ta-sand-50">{trace.name}</span>
-      <span className="type-accent-s text-ta-grey-200">{trace.models.join(", ")}</span>
-      <div className="type-accent-s ml-auto flex shrink-0 items-baseline gap-6 text-ta-grey-100">
+      <span className="type-accent-s min-w-0 truncate text-ta-grey-200">
+        {trace.models.join(", ")}
+      </span>
+      <div className="type-accent-s ml-auto flex shrink-0 items-baseline gap-6 whitespace-nowrap text-ta-grey-100">
         <Stat
           label={<Hint term="generation">generations</Hint>}
           value={String(trace.generations.length)}
@@ -29,6 +34,17 @@ export function Header({ trace, onClear }: HeaderProps) {
         />
         {/* traces without price data report 0 - a real run never costs exactly $0 */}
         {trace.totalCost > 0 && <Stat label="cost" value={formatCost(trace.totalCost)} />}
+        {agentCommand ? (
+          <CopyButton label="copy for agent" text={agentCommand} title={agentCommand} />
+        ) : (
+          <Button
+            disabled
+            className="cursor-default opacity-40 hover:border-ta-grey-400 hover:text-ta-grey-100"
+            title="opened in this browser - agents need a file on disk"
+          >
+            copy for agent
+          </Button>
+        )}
         {onClear && <Button onClick={onClear}>clear</Button>}
       </div>
     </header>

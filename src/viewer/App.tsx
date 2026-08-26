@@ -5,6 +5,7 @@ import { GenerationDetail } from "@/components/GenerationDetail";
 import { Header } from "@/components/Header";
 import { ReplayBar } from "@/components/ReplayBar";
 import { RunList } from "@/components/RunList";
+import { OpenButton, SourceTabs, sourceTabs } from "@/components/SourceTabs";
 import { ToolCallsSection } from "@/components/ToolCallsSection";
 import { TreemapSection } from "@/components/TreemapSection";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -13,7 +14,18 @@ import { useReplay } from "@/lib/use-replay";
 import { useTrace } from "@/lib/use-trace";
 
 export function App() {
-  const { runs, trace, error, live, selectedRun, selectRun } = useTrace();
+  const {
+    runs,
+    trace,
+    error,
+    live,
+    selectedRun,
+    selectRun,
+    command,
+    openFiles,
+    closeSource,
+    openError,
+  } = useTrace();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   if (error) {
@@ -31,6 +43,13 @@ export function App() {
         </Shell>
       );
     }
+    if (!live && runs?.length === 0) {
+      return (
+        <Shell {...dropHandlers(openFiles)}>
+          <NoOpenTraces onOpen={openFiles} openError={openError} />
+        </Shell>
+      );
+    }
     return (
       <Shell>
         <p className="type-accent-m p-8 text-ta-grey-200">loading trace...</p>
@@ -45,10 +64,25 @@ export function App() {
       selectedRun={selectedRun}
       onSelectRun={selectRun}
       live={live}
+      agentCommand={command}
+      openFiles={openFiles}
+      closeSource={closeSource}
+      openError={openError}
       selectedIndex={selectedIndex}
       onSelect={setSelectedIndex}
     />
   );
+}
+
+/** Static mode accepts trace files dropped anywhere in the window. */
+function dropHandlers(openFiles: (files: Iterable<File>) => void) {
+  return {
+    onDragOver: (e: React.DragEvent) => e.preventDefault(),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer.files.length > 0) openFiles(e.dataTransfer.files);
+    },
+  };
 }
 
 interface LoadedProps {
@@ -57,6 +91,10 @@ interface LoadedProps {
   selectedRun?: string;
   onSelectRun: (id: string) => void;
   live: boolean;
+  agentCommand?: string;
+  openFiles: (files: Iterable<File>) => void;
+  closeSource: (source: string) => void;
+  openError?: string;
   selectedIndex: number;
   onSelect: (index: number) => void;
 }
@@ -67,10 +105,19 @@ function Loaded({
   selectedRun,
   onSelectRun,
   live,
+  agentCommand,
+  openFiles,
+  closeSource,
+  openError,
   selectedIndex,
   onSelect,
 }: LoadedProps) {
   const replay = useReplay(trace);
+
+  // several opened files become tabs; devtools' live feed stays a plain list
+  const tabs = live ? [] : sourceTabs(runs);
+  const selectedSource = runs.find((run) => run.id === selectedRun)?.source;
+  const scopedRuns = tabs.length > 0 ? runs.filter((run) => run.source === selectedSource) : runs;
 
   // follow the playhead: the entered generation becomes the selection
   useEffect(() => {
@@ -113,16 +160,27 @@ function Loaded({
   };
 
   return (
-    <Shell>
+    <Shell {...(live ? {} : dropHandlers(openFiles))}>
       <Header
         trace={trace}
+        agentCommand={agentCommand}
         onClear={live ? () => void fetch("/api/clear", { method: "POST" }) : undefined}
       />
+      {tabs.length > 0 && (
+        <SourceTabs
+          tabs={tabs}
+          selectedSource={selectedSource}
+          onSelect={(tab) => onSelectRun(tab.runs.at(-1)!.id)}
+          onClose={closeSource}
+          onOpen={openFiles}
+          openError={openError}
+        />
+      )}
       <div className="flex min-h-0 flex-1">
         {/* stable gutters: a scrollbar appearing mid-stream must not shift the layout */}
         <aside className="w-80 shrink-0 overflow-y-auto border-r border-ta-grey-400 [scrollbar-gutter:stable]">
-          {runs.length > 1 && (
-            <RunList runs={runs} selectedId={selectedRun} onSelect={onSelectRun} />
+          {scopedRuns.length > 1 && (
+            <RunList runs={scopedRuns} selectedId={selectedRun} onSelect={onSelectRun} />
           )}
           <Waterfall trace={trace} selectedIndex={selected.index} onSelect={selectGeneration} />
         </aside>
@@ -210,9 +268,28 @@ function Snippet({ text }: { text: string }) {
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function NoOpenTraces({
+  onOpen,
+  openError,
+}: {
+  onOpen: (files: Iterable<File>) => void;
+  openError?: string;
+}) {
   return (
-    <div className="ta-landing flex h-screen flex-col bg-ta-grey-500 text-ta-sand-50">
+    <div className="flex flex-1 items-center justify-center p-8">
+      <div className="flex w-full max-w-md flex-col items-center gap-4 border border-ta-grey-400 bg-ta-grey-450 px-8 py-10">
+        <p className="type-accent-m text-ta-sand-50">no open traces</p>
+        <OpenButton onOpen={onOpen}>open trace file</OpenButton>
+        <p className="type-body-s text-ta-grey-200">or drop a .json anywhere in this window</p>
+        {openError && <p className="type-accent-s text-ta-error">{openError}</p>}
+      </div>
+    </div>
+  );
+}
+
+function Shell({ children, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div className="ta-landing flex h-screen flex-col bg-ta-grey-500 text-ta-sand-50" {...props}>
       {children}
     </div>
   );

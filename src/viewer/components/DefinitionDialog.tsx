@@ -1,4 +1,5 @@
 import { contentToText } from "@core/normalize";
+import { resolvePath } from "@core/path";
 import { prettyArgs, prettyPayload } from "@core/pretty";
 import type { RawMessage, RawToolDef } from "@core/types";
 import { useEffect, useState } from "react";
@@ -7,6 +8,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Markdown } from "@/components/ui/markdown";
 import type { TreemapLeaf } from "@/lib/treemap-data";
+import { localRawTrace } from "@/lib/use-trace";
 
 /** Full definition of a clicked treemap block: pretty-rendered, raw JSON a toggle away. */
 export function DefinitionDialog({
@@ -160,6 +162,13 @@ function Mono({ children }: { children: string }) {
 
 /** Fetches a raw-trace value, failing legibly when the server is older than the viewer. */
 async function fetchRawValue(traceId: string, ref: string): Promise<unknown> {
+  // browser-opened files never reached the server; resolve against local raw
+  const local = localRawTrace(traceId);
+  if (local !== undefined) {
+    const value = resolvePath(local, ref);
+    if (value === undefined) throw new Error("nothing at path");
+    return value;
+  }
   const res = await fetch(
     `/api/raw?id=${encodeURIComponent(traceId)}&path=${encodeURIComponent(ref)}`,
   );

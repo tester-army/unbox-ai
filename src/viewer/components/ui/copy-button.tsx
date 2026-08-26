@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/button";
 interface CopyButtonProps {
   /** Text to copy, or a producer so large strings aren't built until needed. */
   text: string | (() => string);
+  /** Idle label; the confirmation always reads "copied". */
+  label?: string;
+  title?: string;
   className?: string;
 }
 
 /** Copies text to the clipboard with a brief "copied" confirmation. */
-export function CopyButton({ text, className }: CopyButtonProps) {
+export function CopyButton({ text, label = "copy", title, className }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -16,6 +19,7 @@ export function CopyButton({ text, className }: CopyButtonProps) {
   return (
     <Button
       className={className}
+      title={title}
       onClick={async (e) => {
         e.stopPropagation();
         const value = typeof text === "function" ? text() : text;
@@ -37,7 +41,7 @@ export function CopyButton({ text, className }: CopyButtonProps) {
         timer.current = setTimeout(() => setCopied(false), 1200);
       }}
     >
-      {copied ? "copied" : "copy"}
+      {copied ? "copied" : label}
     </Button>
   );
 }
