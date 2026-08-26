@@ -164,19 +164,19 @@ function HeaderCell({ children, right }: { children: React.ReactNode; right?: bo
   return <span className={cn("text-ta-grey-300", right && "text-right")}>{children}</span>;
 }
 
-const ROW_GRID = "grid grid-cols-[3rem_1fr_1fr] gap-x-4";
+const ROW_GRID = "grid grid-cols-[4.5rem_1fr_1fr] gap-x-4";
 
 function Trajectory({ steps }: { steps: TrajectoryStep[] }) {
   const [expanded, setExpanded] = useState<number>();
-  const firstDifference = steps.find(
+  const different = steps.filter(
     (step) => step.diverged || step.a === undefined || step.b === undefined,
-  )?.index;
+  );
   return (
     <Section
       label={
-        firstDifference === undefined
-          ? "trajectory · aligned by generation · same actions throughout"
-          : `trajectory · aligned by generation · differs from [${firstDifference}]`
+        different.length === 0
+          ? "trajectory · aligned by action · same actions throughout"
+          : `trajectory · aligned by action · differs at ${different.length} of ${steps.length} steps`
       }
     >
       <div className="border border-ta-grey-400">
@@ -190,39 +190,58 @@ function Trajectory({ steps }: { steps: TrajectoryStep[] }) {
           <span>A</span>
           <span>B</span>
         </div>
-        {steps.map((step) => (
-          <div key={step.index} className="border-b border-ta-grey-400 last:border-b-0">
-            <button
-              type="button"
-              onClick={() => setExpanded(expanded === step.index ? undefined : step.index)}
-              aria-expanded={expanded === step.index}
-              className={cn(
-                ROW_GRID,
-                "type-accent-s w-full cursor-pointer px-4 py-2 text-left transition-colors hover:bg-ta-grey-450",
-                expanded === step.index && "bg-ta-grey-450",
-              )}
+        {steps.map((step, row) => {
+          const differs = step.diverged || step.a === undefined || step.b === undefined;
+          return (
+            <div
+              key={`${step.a?.index ?? "-"}:${step.b?.index ?? "-"}`}
+              className="border-b border-ta-grey-400 last:border-b-0"
             >
-              <span className={step.diverged ? "text-ta-orange-300" : "text-ta-grey-300"}>
-                {step.index}
-                {step.diverged && " *"}
-              </span>
-              <GenCell gen={step.a} diverged={step.diverged} />
-              <GenCell gen={step.b} diverged={step.diverged} />
-            </button>
-            {expanded === step.index && (
-              <div
-                className={cn(ROW_GRID, "border-t border-ta-grey-400 bg-ta-grey-450/40 px-4 py-3")}
+              <button
+                type="button"
+                onClick={() => setExpanded(expanded === row ? undefined : row)}
+                aria-expanded={expanded === row}
+                className={cn(
+                  ROW_GRID,
+                  "type-accent-s w-full cursor-pointer px-4 py-2 text-left transition-colors hover:bg-ta-grey-450",
+                  expanded === row && "bg-ta-grey-450",
+                )}
               >
-                <span />
-                <GenDetail gen={step.a} />
-                <GenDetail gen={step.b} />
-              </div>
-            )}
-          </div>
-        ))}
+                <span className={differs ? "text-ta-orange-300" : "text-ta-grey-300"}>
+                  {stepIndexLabel(step)}
+                  {differs && " *"}
+                </span>
+                <GenCell gen={step.a} diverged={step.diverged} />
+                <GenCell gen={step.b} diverged={step.diverged} />
+              </button>
+              {expanded === row && (
+                <div
+                  className={cn(
+                    ROW_GRID,
+                    "border-t border-ta-grey-400 bg-ta-grey-450/40 px-4 py-3",
+                  )}
+                >
+                  <span />
+                  <GenDetail gen={step.a} />
+                  <GenDetail gen={step.b} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Section>
   );
+}
+
+/** "12" when both sides sit at the same generation, else "a12/b13" style. */
+function stepIndexLabel(step: TrajectoryStep): string {
+  if (step.a !== undefined && step.b !== undefined) {
+    return step.a.index === step.b.index
+      ? String(step.a.index)
+      : `a${step.a.index}/b${step.b.index}`;
+  }
+  return step.a !== undefined ? `a${step.a.index}` : `b${step.b!.index}`;
 }
 
 function GenCell({ gen, diverged }: { gen?: Generation; diverged: boolean }) {

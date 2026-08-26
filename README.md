@@ -125,8 +125,9 @@ unbox-ai compare a.json b.json       # A/B two runs: metric deltas + system prom
 `compare` is built for prompt and model A/B: it prints token / cost / time /
 cache deltas, then a line diff of the system prompt and the added / removed /
 changed tool definitions - "what changed and what did it buy". Add
-`--trajectory` for an aligned per-generation action table that marks where
-the runs diverged. Two runs of one file: `unbox-ai compare db.json --run 0
+`--trajectory` for a content-aligned action table (LCS over tool sequences,
+so an extra step in one run offsets nothing) that marks exactly which steps
+differ. Two runs of one file: `unbox-ai compare db.json --run 0
 --run 1`. The viewer has the same thing interactively: a **compare** button
 (2+ runs) opens a side-by-side trajectory where each aligned generation
 expands into both runs' messages.

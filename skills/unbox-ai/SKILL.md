@@ -40,9 +40,10 @@ unbox-ai compare <a> <b>        # A/B: metric deltas + system prompt / tool-set 
   deltas, then a line diff of the system prompt and added/removed/changed
   tools. Two runs of one file: `compare <trace> --run 0 --run 1` (first --run
   scopes A, second B). Diff output is bounded; `--json` has the full diff.
-  `--trajectory` adds an aligned per-generation action table (* = the runs
-  called different tools at that step) - the fastest way to find where two
-  runs diverged.
+  `--trajectory` adds a content-aligned action table (* = differing step,
+  - = no counterpart; alignment is LCS over tool sequences, so an extra step
+  in one run offsets nothing) - the fastest way to see where two runs
+  actually diverged.
 - `unbox-ai view <trace>` starts a localhost visualization - only offer this
   to the human; as an agent, stay on the read commands.
 

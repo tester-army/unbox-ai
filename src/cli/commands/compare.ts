@@ -34,7 +34,6 @@ export function compare(
       b: side(b, labels.b),
       ...comparison,
       trajectory: steps.map((step) => ({
-        index: step.index,
         diverged: step.diverged,
         a: stepJson(step.a),
         b: stepJson(step.b),
@@ -68,15 +67,24 @@ export function compare(
   if (options.trajectory) {
     console.log("");
     printTrajectory(steps);
-  } else if (steps.some((step) => step.diverged || step.a === undefined || step.b === undefined)) {
-    const at = steps.find((s) => s.diverged || s.a === undefined || s.b === undefined)!.index;
-    console.log(`\ntrajectories differ from generation ${at} - see: --trajectory`);
+  } else {
+    const different = steps.filter(
+      (step) => step.diverged || step.a === undefined || step.b === undefined,
+    );
+    if (different.length > 0) {
+      const at = different[0]!;
+      console.log(
+        `\ntrajectories differ at ${different.length} of ${steps.length} steps ` +
+          `(first at generation ${(at.a ?? at.b)!.index}) - see: --trajectory`,
+      );
+    }
   }
 }
 
 function stepJson(gen: Generation | undefined) {
   if (gen === undefined) return null;
   return {
+    index: gen.index,
     tools: toolCallNames(gen),
     inputTokens: gen.metrics.inputTokens,
     outputTokens: gen.metrics.outputTokens,
@@ -84,20 +92,30 @@ function stepJson(gen: Generation | undefined) {
   };
 }
 
-/** Aligned per-generation actions; "*" marks steps where the runs did different things. */
+/** Content-aligned per-generation actions; "*" marks steps where the runs differ. */
 function printTrajectory(steps: TrajectoryStep[]): void {
-  console.log("trajectory (aligned by generation · * = different action)");
+  console.log("trajectory (aligned by action · * = differs · - = no counterpart)");
   console.log(
     table(
       ["gen", "", "A", "B"],
       steps.map((step) => [
-        String(step.index),
-        step.diverged ? "*" : "",
+        indexCell(step),
+        step.diverged || step.a === undefined || step.b === undefined ? "*" : "",
         actionCell(step.a),
         actionCell(step.b),
       ]),
     ),
   );
+}
+
+/** "12" when both sides sit at the same generation, else "a12/b13" style. */
+function indexCell(step: TrajectoryStep): string {
+  if (step.a !== undefined && step.b !== undefined) {
+    return step.a.index === step.b.index
+      ? String(step.a.index)
+      : `a${step.a.index}/b${step.b.index}`;
+  }
+  return step.a !== undefined ? `a${step.a.index}` : `b${step.b!.index}`;
 }
 
 function actionCell(gen: Generation | undefined): string {

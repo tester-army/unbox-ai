@@ -142,7 +142,6 @@ function defKey(def: RawToolDef): string {
 }
 
 export interface TrajectoryStep {
-  index: number;
   a?: Generation;
   b?: Generation;
   /** Both sides exist and took a different action (tool sequence or text-only). */
@@ -150,17 +149,47 @@ export interface TrajectoryStep {
 }
 
 /**
- * Pairs the runs' generations index by index - the honest v1 alignment.
- * A missing side marks the shorter run's tail; divergence marks steps
- * where the runs called different tools (or one answered in text).
+ * Aligns the runs' generations by action content (LCS over tool sequences),
+ * so an extra step in one run offsets nothing: matched steps pair up, and
+ * insertions show as one-sided rows. Runs of mismatches are zipped into
+ * diverged pairs. Falls back to index alignment on pathologically long runs.
  */
 export function pairTrajectory(a: NormalizedTrace, b: NormalizedTrace): TrajectoryStep[] {
+  const diff = diffLines(a.generations.map(actionKey), b.generations.map(actionKey));
+  if (diff === undefined) return pairByIndex(a, b);
+  const steps: TrajectoryStep[] = [];
+  let i = 0;
+  let j = 0;
+  let k = 0;
+  while (k < diff.length) {
+    if (diff[k]!.kind === "same") {
+      steps.push({ a: a.generations[i++]!, b: b.generations[j++]!, diverged: false });
+      k++;
+      continue;
+    }
+    const removed: Generation[] = [];
+    const added: Generation[] = [];
+    for (; k < diff.length && diff[k]!.kind !== "same"; k++) {
+      if (diff[k]!.kind === "removed") removed.push(a.generations[i++]!);
+      else added.push(b.generations[j++]!);
+    }
+    for (let r = 0; r < Math.max(removed.length, added.length); r++) {
+      steps.push({
+        ...(removed[r] !== undefined ? { a: removed[r] } : {}),
+        ...(added[r] !== undefined ? { b: added[r] } : {}),
+        diverged: removed[r] !== undefined && added[r] !== undefined,
+      });
+    }
+  }
+  return steps;
+}
+
+function pairByIndex(a: NormalizedTrace, b: NormalizedTrace): TrajectoryStep[] {
   const length = Math.max(a.generations.length, b.generations.length);
   return Array.from({ length }, (_, index) => {
     const genA = a.generations[index];
     const genB = b.generations[index];
     return {
-      index,
       ...(genA !== undefined ? { a: genA } : {}),
       ...(genB !== undefined ? { b: genB } : {}),
       diverged: genA !== undefined && genB !== undefined && actionKey(genA) !== actionKey(genB),

@@ -111,21 +111,24 @@ describe("compareTraces", () => {
 });
 
 describe("pairTrajectory", () => {
-  it("aligns by index, marks divergence and missing tails", () => {
-    const withTool = (id: string, events: number, tool?: string): RawTrace => {
-      const raw = rawTrace({ id, events });
-      if (tool !== undefined) {
-        raw.events[0]!.messages.push({
+  const sequence = (id: string, actions: (string | null)[]): RawTrace => {
+    const raw = rawTrace({ id, events: actions.length });
+    actions.forEach((tool, i) => {
+      if (tool !== null) {
+        raw.events[i]!.messages.push({
           role: "assistant",
           content: "",
-          tool_calls: [{ type: "function", id: "c1", function: { name: tool, arguments: {} } }],
+          tool_calls: [{ type: "function", id: `c${i}`, function: { name: tool, arguments: {} } }],
         });
       }
-      return raw;
-    };
+    });
+    return raw;
+  };
+
+  it("pairs mismatched actions as diverged and unmatched tails as one-sided", () => {
     const steps = pairTrajectory(
-      normalizeTrace(withTool("a", 2, "search")),
-      normalizeTrace(withTool("b", 3, "fetch")),
+      normalizeTrace(sequence("a", ["search", null])),
+      normalizeTrace(sequence("b", ["fetch", null, null])),
     );
     expect(steps).toHaveLength(3);
     expect(steps[0]!.diverged).toBe(true);
@@ -133,6 +136,19 @@ describe("pairTrajectory", () => {
     expect(steps[2]!.a).toBeUndefined();
     expect(steps[2]!.b).toBeDefined();
     expect(steps[2]!.diverged).toBe(false);
+  });
+
+  it("re-aligns after an extra step instead of cascading divergence", () => {
+    const steps = pairTrajectory(
+      normalizeTrace(sequence("a", ["nav", "extra", "click"])),
+      normalizeTrace(sequence("b", ["nav", "click"])),
+    );
+    expect(steps).toHaveLength(3);
+    expect(steps.map((s) => s.diverged)).toEqual([false, false, false]);
+    expect(steps[1]!.b).toBeUndefined();
+    // the click after the insertion pairs up despite the index offset
+    expect(steps[2]!.a?.index).toBe(2);
+    expect(steps[2]!.b?.index).toBe(1);
   });
 });
 
