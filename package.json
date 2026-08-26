@@ -39,7 +39,7 @@
     "test:watch": "vitest",
     "check": "npm run lint && npm run typecheck && npm run test",
     "prepublishOnly": "npm run check && npm run build",
-    "release": "release-it"
+    "release": "GITHUB_TOKEN=${GITHUB_TOKEN:-$(gh auth token)} release-it"
   },
   "devDependencies": {
     "@base-ui-components/react": "1.0.0-rc.0",

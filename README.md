@@ -200,7 +200,7 @@ npm run check                                 # lint (biome) + typecheck + tests
 
 ## Releasing
 
-`npm run release` (from main, clean tree) runs [release-it](https://github.com/release-it/release-it): version inferred from conventional commits, CHANGELOG.md updated, git tag + GitHub release + npm publish. Needs `GITHUB_TOKEN` (e.g. `export GITHUB_TOKEN=$(gh auth token)`) and `npm login`. Preview with `npm run release -- --dry-run --ci`.
+`npm run release` (from main, clean tree) runs [release-it](https://github.com/release-it/release-it): version inferred from conventional commits, CHANGELOG.md updated, git tag + GitHub release + npm publish. The GitHub token comes from `gh auth token` (or a `GITHUB_TOKEN` you export); npm needs `npm login` once. Preview with `npm run release -- --dry-run --ci`.
 
 ## License
 
