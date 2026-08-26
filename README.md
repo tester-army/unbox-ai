@@ -188,7 +188,7 @@ reference. `unbox-ai summary` prints which format was detected.
 
 ## Contributing
 
-PRs welcome, especially trace-format adapters. To develop locally:
+PRs welcome, especially trace-format adapters. The published CLI runs on Node >=18; developing and releasing need Node >=22.21 (what CI uses). To develop locally:
 
 ```bash
 npm install
