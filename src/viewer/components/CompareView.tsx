@@ -164,77 +164,89 @@ function MetricsGrid({ comparison, labels }: { comparison: TraceComparison; labe
           : `totals · ${labels.a}: ${models.a.join(", ")} · ${labels.b}: ${models.b.join(", ")}`
       }
     >
-      <DeltaChart metrics={metrics} labels={labels} />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
+        {metrics.map((m) => (
+          <MetricTile key={m.key} metric={m} labels={labels} />
+        ))}
+      </div>
     </Section>
   );
 }
 
 /**
- * One row per metric, read left to right like a sentence: value went from A
- * to B, changed by this much, and the bar is the size of that change. Bars
- * share one scale (largest |change|, capped at 100%) and are magnitude-only;
- * the arrow carries the direction.
+ * One metric per tile, the change as the hero: a big percent with an arrow,
+ * "from -> to" under it, and a small per-tile pair of bars for proportion.
+ * Unchanged metrics dim so the moved ones carry the panel.
  */
-function DeltaChart({ metrics, labels }: { metrics: ComparedMetric[]; labels: SideLabels }) {
-  const rows = metrics.map((m) => ({ m, rel: relativeDelta(m) }));
-  const scale = Math.max(...rows.map((row) => Math.abs(row.rel)), 0.01);
+function MetricTile({ metric, labels }: { metric: ComparedMetric; labels: SideLabels }) {
+  const delta = metricDelta(metric);
+  const equal = delta === "=";
   return (
-    <div className="border border-ta-grey-400 px-5 py-4">
-      <div className="type-accent-s grid grid-cols-[minmax(8rem,auto)_minmax(5.5rem,auto)_minmax(5.5rem,auto)_minmax(10rem,auto)_1fr] items-center gap-x-6 gap-y-2">
-        <span className="text-ta-grey-300">metric</span>
-        <span className="truncate text-right text-ta-grey-300">{labels.a}</span>
-        <span className="truncate text-right text-ta-grey-300">{labels.b}</span>
-        <span className="text-right text-ta-grey-300">change</span>
-        <span className="text-ta-grey-300">size of change</span>
-        {rows.map(({ m, rel }) => {
-          const delta = metricDelta(m);
-          return (
-            <div key={m.key} className="contents">
-              <span className="text-ta-grey-200">{m.key}</span>
-              <span className="text-right text-ta-grey-100">{metricValue(m.kind, m.a)}</span>
-              <span className="text-right text-ta-grey-100">{metricValue(m.kind, m.b)}</span>
-              <span
-                className={cn("text-right", rel === 0 ? "text-ta-grey-300" : "text-ta-sand-50")}
-              >
-                {rel !== 0 && (
-                  <span aria-hidden className="text-ta-orange-300">
-                    {rel > 0 ? "▲ " : "▼ "}
-                  </span>
-                )}
-                {delta}
-              </span>
-              <MagnitudeBar rel={rel} scale={scale} />
-            </div>
-          );
-        })}
-      </div>
+    <div
+      className={cn(
+        "flex flex-col gap-2.5 border border-ta-grey-400 bg-ta-grey-450/40 px-4 py-3",
+        equal && "opacity-55",
+      )}
+      title={`${metric.key}: ${delta}`}
+    >
+      <span className="type-accent-s text-ta-grey-200">{metric.key}</span>
+      <span className="font-(family-name:--font-dm-mono) text-2xl leading-none tracking-wide text-ta-sand-50">
+        {equal ? (
+          <span className="text-ta-grey-300">=</span>
+        ) : (
+          <>
+            <span aria-hidden className="text-ta-orange-300">
+              {metric.b > metric.a ? "▲" : "▼"}
+            </span>{" "}
+            {heroDelta(metric)}
+          </>
+        )}
+      </span>
+      <span className="type-accent-s text-ta-grey-200">
+        {metricValue(metric.kind, metric.a)} <span className="text-ta-grey-300">-&gt;</span>{" "}
+        {metricValue(metric.kind, metric.b)}
+      </span>
+      <PairBars metric={metric} labels={labels} />
     </div>
   );
 }
 
-/**
- * B's change relative to A: (b-a)/a for magnitudes (capped at +-100%, the
- * printed delta carries the exact number), plain point difference for
- * shares, +100% when A is zero and B is not.
- */
-function relativeDelta(metric: ComparedMetric): number {
-  if (metric.kind === "share") return metric.b - metric.a;
-  if (metric.a > 0) return Math.max(Math.min((metric.b - metric.a) / metric.a, 1), -1);
-  return metric.b > 0 ? 1 : 0;
+/** The tile's headline: relative change when A gives a base, else absolute. */
+function heroDelta(metric: ComparedMetric): string {
+  const abs = Math.abs(metric.b - metric.a);
+  if (metric.kind === "share") return `${Math.round(abs * 100)}pp`;
+  if (metric.a > 0) {
+    const percent = Math.round((abs / metric.a) * 100);
+    return percent === 0 ? "<1%" : `${percent}%`;
+  }
+  return metricValue(metric.kind, abs);
 }
 
-/** Left-anchored |change| bar; direction lives in the row's arrow, not here. */
-function MagnitudeBar({ rel, scale }: { rel: number; scale: number }) {
-  const width = rel === 0 ? 0 : Math.max(Math.min((Math.abs(rel) / scale) * 100, 100), 1);
+/** Both runs' magnitudes on the tile's own scale; shares scale to 100%. */
+function PairBars({ metric, labels }: { metric: ComparedMetric; labels: SideLabels }) {
+  const scale = metric.kind === "share" ? 1 : Math.max(metric.a, metric.b);
+  const width = (v: number) => (scale <= 0 || v <= 0 ? 0 : Math.max((v / scale) * 100, 1.5));
   return (
-    <div className="relative h-3 w-full max-w-2xl bg-ta-grey-450/60">
-      {width > 0 && (
-        <span
-          aria-hidden
-          className="absolute inset-y-[3px] left-0 bg-ta-orange-300"
-          style={{ width: `${width}%` }}
-        />
-      )}
+    <div className="flex flex-col gap-1">
+      <PairBar label={labels.a} color="bg-ta-grey-300" width={width(metric.a)} />
+      <PairBar label={labels.b} color="bg-ta-orange-300" width={width(metric.b)} />
+    </div>
+  );
+}
+
+function PairBar({ label, color, width }: { label: string; color: string; width: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="type-accent-s w-16 shrink-0 truncate text-ta-grey-300">{label}</span>
+      <div className="relative h-2 flex-1 bg-ta-grey-450">
+        {width > 0 && (
+          <span
+            aria-hidden
+            className={cn("absolute inset-y-0 left-0", color)}
+            style={{ width: `${width}%` }}
+          />
+        )}
+      </div>
     </div>
   );
 }
