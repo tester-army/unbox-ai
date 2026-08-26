@@ -62,11 +62,22 @@ export function CompareView({ runs, initialA, onClose }: CompareViewProps) {
     [sides],
   );
 
+  const labels = { a: shortLabel(runs, aId), b: shortLabel(runs, bId) };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-3 border-b border-ta-grey-400 px-6 py-3">
         <RunSelect side="A" runs={runs} value={aId} onChange={setAId} />
-        <span className="type-accent-s shrink-0 text-ta-grey-300">vs</span>
+        <Button
+          className="shrink-0"
+          title="swap sides"
+          onClick={() => {
+            setAId(bId);
+            setBId(aId);
+          }}
+        >
+          swap
+        </Button>
         <RunSelect side="B" runs={runs} value={bId} onChange={setBId} />
         <Button className="shrink-0" onClick={onClose}>
           close
@@ -79,8 +90,8 @@ export function CompareView({ runs, initialA, onClose }: CompareViewProps) {
         )}
         {comparison && steps && (
           <>
-            <MetricsGrid comparison={comparison} />
-            <Trajectory steps={steps} />
+            <MetricsGrid comparison={comparison} labels={labels} />
+            <Trajectory steps={steps} labels={labels} />
             <PromptSection prompt={comparison.systemPrompt} />
             <ToolsSection tools={comparison.tools} />
           </>
@@ -88,6 +99,18 @@ export function CompareView({ runs, initialA, onClose }: CompareViewProps) {
       </div>
     </div>
   );
+}
+
+/** A short, human name for a side: file basename without the trace suffix. */
+function shortLabel(runs: RunSummary[], id: string): string {
+  const run = runs.find((r) => r.id === id);
+  const base = run?.source
+    ?.split(/[\\/]/)
+    .filter(Boolean)
+    .at(-1)
+    ?.replace(/\.trace\.json$|\.json$/, "");
+  const label = base ?? run?.name ?? id;
+  return label.length > 16 ? `${label.slice(0, 15)}…` : label;
 }
 
 function RunSelect({
@@ -125,7 +148,12 @@ function runLabel(run: RunSummary): string {
   return base !== undefined ? `${base} · ${run.name}` : run.name;
 }
 
-function MetricsGrid({ comparison }: { comparison: TraceComparison }) {
+interface SideLabels {
+  a: string;
+  b: string;
+}
+
+function MetricsGrid({ comparison, labels }: { comparison: TraceComparison; labels: SideLabels }) {
   const { models, metrics } = comparison;
   const sameModels = models.a.join(", ") === models.b.join(", ");
   return (
@@ -133,44 +161,49 @@ function MetricsGrid({ comparison }: { comparison: TraceComparison }) {
       label={
         sameModels
           ? `totals · ${models.a.join(", ")}`
-          : `totals · A: ${models.a.join(", ")} · B: ${models.b.join(", ")}`
+          : `totals · ${labels.a}: ${models.a.join(", ")} · ${labels.b}: ${models.b.join(", ")}`
       }
     >
-      <DeltaChart metrics={metrics} />
+      <DeltaChart metrics={metrics} labels={labels} />
     </Section>
   );
 }
 
 /**
- * Diverging bar per metric: B relative to A around a shared zero line, all
- * rows on one scale (the largest |delta|, capped at 100%) so the metric that
- * moved most sticks out and near-equal runs read as bars hugging zero.
- * Position encodes direction; the printed delta is the exact value.
+ * One row per metric, read left to right like a sentence: value went from A
+ * to B, changed by this much, and the bar is the size of that change. Bars
+ * share one scale (largest |change|, capped at 100%) and are magnitude-only;
+ * the arrow carries the direction.
  */
-function DeltaChart({ metrics }: { metrics: ComparedMetric[] }) {
+function DeltaChart({ metrics, labels }: { metrics: ComparedMetric[]; labels: SideLabels }) {
   const rows = metrics.map((m) => ({ m, rel: relativeDelta(m) }));
   const scale = Math.max(...rows.map((row) => Math.abs(row.rel)), 0.01);
   return (
     <div className="border border-ta-grey-400 px-5 py-4">
-      <div className="type-accent-s grid grid-cols-[minmax(7rem,auto)_minmax(4.5rem,auto)_1fr_minmax(4.5rem,auto)_minmax(7rem,auto)] items-center gap-x-5 gap-y-2">
+      <div className="type-accent-s grid grid-cols-[minmax(8rem,auto)_minmax(5.5rem,auto)_minmax(5.5rem,auto)_minmax(10rem,auto)_1fr] items-center gap-x-6 gap-y-2">
         <span className="text-ta-grey-300">metric</span>
-        <span className="text-right text-ta-grey-300">A</span>
-        <span className="text-center text-ta-grey-300">B vs A · scale ±{pct(scale)}</span>
-        <span className="text-ta-grey-300">B</span>
-        <span className="text-right text-ta-grey-300">delta</span>
+        <span className="truncate text-right text-ta-grey-300">{labels.a}</span>
+        <span className="truncate text-right text-ta-grey-300">{labels.b}</span>
+        <span className="text-right text-ta-grey-300">change</span>
+        <span className="text-ta-grey-300">size of change</span>
         {rows.map(({ m, rel }) => {
           const delta = metricDelta(m);
           return (
             <div key={m.key} className="contents">
               <span className="text-ta-grey-200">{m.key}</span>
               <span className="text-right text-ta-grey-100">{metricValue(m.kind, m.a)}</span>
-              <DeltaBar rel={rel} scale={scale} />
-              <span className="text-ta-grey-100">{metricValue(m.kind, m.b)}</span>
+              <span className="text-right text-ta-grey-100">{metricValue(m.kind, m.b)}</span>
               <span
-                className={cn("text-right", delta === "=" ? "text-ta-grey-300" : "text-ta-sand-50")}
+                className={cn("text-right", rel === 0 ? "text-ta-grey-300" : "text-ta-sand-50")}
               >
+                {rel !== 0 && (
+                  <span aria-hidden className="text-ta-orange-300">
+                    {rel > 0 ? "▲ " : "▼ "}
+                  </span>
+                )}
                 {delta}
               </span>
+              <MagnitudeBar rel={rel} scale={scale} />
             </div>
           );
         })}
@@ -190,24 +223,16 @@ function relativeDelta(metric: ComparedMetric): number {
   return metric.b > 0 ? 1 : 0;
 }
 
-function pct(fraction: number): string {
-  const points = fraction * 100;
-  return `${points >= 10 ? Math.round(points) : Math.round(points * 10) / 10}%`;
-}
-
-function DeltaBar({ rel, scale }: { rel: number; scale: number }) {
-  const half = Math.min((Math.abs(rel) / scale) * 50, 50);
-  const width = rel === 0 ? 0 : Math.max(half, 0.75);
+/** Left-anchored |change| bar; direction lives in the row's arrow, not here. */
+function MagnitudeBar({ rel, scale }: { rel: number; scale: number }) {
+  const width = rel === 0 ? 0 : Math.max(Math.min((Math.abs(rel) / scale) * 100, 100), 1);
   return (
-    <div className="relative h-3 w-full bg-ta-grey-450/60">
-      <span aria-hidden className="absolute inset-y-0 left-1/2 w-px bg-ta-grey-300" />
+    <div className="relative h-3 w-full max-w-2xl bg-ta-grey-450/60">
       {width > 0 && (
         <span
           aria-hidden
-          className="absolute inset-y-[3px] bg-ta-orange-300"
-          style={
-            rel > 0 ? { left: "50%", width: `${width}%` } : { right: "50%", width: `${width}%` }
-          }
+          className="absolute inset-y-[3px] left-0 bg-ta-orange-300"
+          style={{ width: `${width}%` }}
         />
       )}
     </div>
@@ -216,7 +241,7 @@ function DeltaBar({ rel, scale }: { rel: number; scale: number }) {
 
 const ROW_GRID = "grid grid-cols-[4.5rem_1fr_1fr] gap-x-4";
 
-function Trajectory({ steps }: { steps: TrajectoryStep[] }) {
+function Trajectory({ steps, labels }: { steps: TrajectoryStep[]; labels: SideLabels }) {
   const [expanded, setExpanded] = useState<number>();
   const different = steps.filter(
     (step) => step.diverged || step.a === undefined || step.b === undefined,
@@ -237,8 +262,8 @@ function Trajectory({ steps }: { steps: TrajectoryStep[] }) {
           )}
         >
           <span>gen</span>
-          <span>A</span>
-          <span>B</span>
+          <span className="truncate">A · {labels.a}</span>
+          <span className="truncate">B · {labels.b}</span>
         </div>
         {steps.map((step, row) => {
           const differs = step.diverged || step.a === undefined || step.b === undefined;
