@@ -1,6 +1,7 @@
 import type { RunSummary } from "@core/collection";
 import type { NormalizedTrace } from "@core/types";
 import { useEffect, useRef, useState } from "react";
+import { CompareDialog } from "@/components/CompareDialog";
 import { GenerationDetail } from "@/components/GenerationDetail";
 import { Header } from "@/components/Header";
 import { ReplayBar } from "@/components/ReplayBar";
@@ -113,6 +114,7 @@ function Loaded({
   onSelect,
 }: LoadedProps) {
   const replay = useReplay(trace);
+  const [comparing, setComparing] = useState(false);
 
   // several opened files become tabs; devtools' live feed stays a plain list
   const tabs = live ? [] : sourceTabs(runs);
@@ -164,8 +166,16 @@ function Loaded({
       <Header
         trace={trace}
         agentCommand={agentCommand}
+        onCompare={runs.length > 1 ? () => setComparing(true) : undefined}
         onClear={live ? () => void fetch("/api/clear", { method: "POST" }) : undefined}
       />
+      {comparing && (
+        <CompareDialog
+          runs={runs}
+          initialA={selectedRun ?? trace.traceId}
+          onClose={() => setComparing(false)}
+        />
+      )}
       {tabs.length > 0 && (
         <SourceTabs
           tabs={tabs}

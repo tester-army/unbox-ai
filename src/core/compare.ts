@@ -1,4 +1,5 @@
 import { type DiffLine, diffLines } from "./diff";
+import { formatCost, formatSeconds, formatTokens } from "./format";
 import { computeInsights } from "./insights";
 import { allToolCalls } from "./normalize";
 import type { NormalizedTrace, RawToolDef, RawTrace } from "./types";
@@ -138,4 +139,40 @@ function compareTools(a: Map<string, RawToolDef>, b: Map<string, RawToolDef>): T
 
 function defKey(def: RawToolDef): string {
   return JSON.stringify({ description: def.description, inputSchema: def.inputSchema });
+}
+
+/** One metric value rendered for its kind, shared by the CLI table and the viewer. */
+export function metricValue(kind: MetricKind, v: number): string {
+  switch (kind) {
+    case "count":
+      return String(v);
+    case "tokens":
+      return formatTokens(v);
+    case "seconds":
+      return formatSeconds(v);
+    case "cost":
+      return formatCost(v);
+    case "share":
+      return `${Math.round(v * 100)}%`;
+  }
+}
+
+/** "-3 (-25%)" style delta, "pp" for share metrics, "=" when equal. */
+export function metricDelta(metric: ComparedMetric): string {
+  const d = metric.b - metric.a;
+  if (d === 0) return "=";
+  const sign = d > 0 ? "+" : "-";
+  const abs = Math.abs(d);
+  if (metric.kind === "share") {
+    const points = Math.round(abs * 100);
+    return points === 0 ? "=" : `${sign}${points}pp`;
+  }
+  const text = {
+    count: String(abs),
+    tokens: formatTokens(abs),
+    seconds: formatSeconds(abs),
+    cost: `$${abs.toFixed(4)}`,
+  }[metric.kind];
+  const relative = metric.a > 0 ? ` (${sign}${Math.round((abs / metric.a) * 100)}%)` : "";
+  return `${sign}${text}${relative}`;
 }

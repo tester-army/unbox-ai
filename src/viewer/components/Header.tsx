@@ -8,11 +8,13 @@ interface HeaderProps {
   trace: NormalizedTrace;
   /** Shell command an agent runs to explore this run from the CLI. */
   agentCommand?: string;
+  /** Present when at least two runs exist; opens the A/B compare dialog. */
+  onCompare?: () => void;
   /** Present in live devtools mode; empties the backing database. */
   onClear?: () => void;
 }
 
-export function Header({ trace, agentCommand, onClear }: HeaderProps) {
+export function Header({ trace, agentCommand, onCompare, onClear }: HeaderProps) {
   return (
     <header className="flex items-baseline gap-6 overflow-hidden border-b border-ta-grey-400 px-6 py-4">
       <h1 className="type-accent-m shrink-0 text-ta-orange-300">unbox-ai</h1>
@@ -34,6 +36,7 @@ export function Header({ trace, agentCommand, onClear }: HeaderProps) {
         />
         {/* traces without price data report 0 - a real run never costs exactly $0 */}
         {trace.totalCost > 0 && <Stat label="cost" value={formatCost(trace.totalCost)} />}
+        {onCompare && <Button onClick={onCompare}>compare</Button>}
         {agentCommand ? (
           <CopyButton label="copy for agent" text={agentCommand} title={agentCommand} />
         ) : (

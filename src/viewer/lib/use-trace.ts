@@ -21,12 +21,17 @@ interface TraceState {
   live: boolean;
 }
 
-/** Raw traces of browser-opened files; stands in for /api/raw on their runs. */
-const localRaws = new Map<string, RawTrace>();
+/** Browser-opened runs by trace id; parsed locally, never known to the server. */
+const localItems = new Map<string, TraceCollectionItem>();
 
 /** The raw trace behind a browser-opened run, or undefined for server runs. */
 export function localRawTrace(traceId: string): RawTrace | undefined {
-  return localRaws.get(traceId);
+  return localItems.get(traceId)?.raw;
+}
+
+/** A browser-opened run with its raw form, or undefined for server runs. */
+export function localTraceItem(traceId: string): TraceCollectionItem | undefined {
+  return localItems.get(traceId);
 }
 
 /**
@@ -49,7 +54,6 @@ export function useTrace(): TraceState & {
   const pinnedRef = useRef(false);
   const seqRef = useRef(0);
   const loadRef = useRef(() => {});
-  const localItemsRef = useRef<TraceCollectionItem[]>([]);
   const closedRef = useRef(new Set<string>());
   const runsRef = useRef<RunSummary[]>([]);
 
@@ -57,7 +61,7 @@ export function useTrace(): TraceState & {
     const seq = ++seqRef.current;
     try {
       const serverRuns = (await fetchJson("/api/traces")) as RunSummary[];
-      const runs = [...serverRuns, ...runSummaries(localItemsRef.current)].filter(
+      const runs = [...serverRuns, ...runSummaries([...localItems.values()])].filter(
         (run) => run.source === undefined || !closedRef.current.has(run.source),
       );
       const latest = defaultRun(runs);
@@ -71,7 +75,7 @@ export function useTrace(): TraceState & {
         pinnedRef.current = false;
       }
       selectedRef.current = selected;
-      const local = localItemsRef.current.find((item) => item.trace.traceId === selected);
+      const local = selected !== undefined ? localItems.get(selected) : undefined;
       const [trace, command] =
         selected === undefined
           ? [undefined, undefined]
@@ -136,7 +140,7 @@ export function useTrace(): TraceState & {
           const items = parseCollection(JSON.parse(await file.text())).items;
           if (items.length === 0) throw new Error("no runs");
           const adopted = adoptItems(items, uniqueSource(file.name, takenSources()), takenIds());
-          localItemsRef.current = [...localItemsRef.current, ...adopted];
+          for (const item of adopted) localItems.set(item.trace.traceId, item);
           lastOpened = adopted.at(-1);
         } catch {
           failure = `${file.name}: not a readable trace`;
@@ -153,12 +157,12 @@ export function useTrace(): TraceState & {
     function takenSources(): Set<string> {
       const taken = new Set(closedRef.current);
       for (const run of runsRef.current) if (run.source !== undefined) taken.add(run.source);
-      for (const item of localItemsRef.current) taken.add(item.sourcePath!);
+      for (const item of localItems.values()) taken.add(item.sourcePath!);
       return taken;
     }
     function takenIds(): Set<string> {
       const taken = new Set(runsRef.current.map((run) => run.id));
-      for (const item of localItemsRef.current) taken.add(item.trace.traceId);
+      for (const id of localItems.keys()) taken.add(id);
       return taken;
     }
   }, []);
@@ -169,10 +173,9 @@ export function useTrace(): TraceState & {
       (s): s is string => s !== undefined,
     );
     closedRef.current.add(source);
-    for (const item of localItemsRef.current) {
-      if (item.sourcePath === source) localRaws.delete(item.trace.traceId);
+    for (const [id, item] of localItems) {
+      if (item.sourcePath === source) localItems.delete(id);
     }
-    localItemsRef.current = localItemsRef.current.filter((item) => item.sourcePath !== source);
     // closing the active tab activates its right neighbor, else the left one
     if (runs.find((run) => run.id === selectedRef.current)?.source === source) {
       const index = order.indexOf(source);
@@ -234,7 +237,6 @@ function adoptItems(
           ? (rename.get(item.trace.parentTraceId) ?? item.trace.parentTraceId)
           : undefined,
     };
-    localRaws.set(trace.traceId, item.raw);
     return { raw: item.raw, trace, sourcePath: source };
   });
 }
