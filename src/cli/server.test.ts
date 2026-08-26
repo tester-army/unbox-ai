@@ -57,6 +57,31 @@ describe("api routes", () => {
     expect(((await res.json()) as { value: string }).value).toBe("test-model");
   });
 
+  it("serves the agent command, quoted and run-scoped as needed", async () => {
+    const plain = await serve(
+      staticSource([{ raw, trace: normalizeTrace(raw), sourcePath: "/tmp/trace.json" }]),
+    );
+    expect(await (await fetch(`${plain.base}/api/command`)).json()).toEqual({
+      command: "npx unbox-ai summary /tmp/trace.json",
+    });
+
+    const raw2: RawTrace = { ...raw, trace_id: "t2" };
+    const multi = await serve(
+      staticSource([
+        { raw, trace: normalizeTrace(raw), sourcePath: "/tmp/my traces.json" },
+        { raw: raw2, trace: normalizeTrace(raw2), sourcePath: "/tmp/my traces.json" },
+      ]),
+    );
+    expect(await (await fetch(`${multi.base}/api/command?id=t1`)).json()).toEqual({
+      command: "npx unbox-ai summary '/tmp/my traces.json' --run t1",
+    });
+  });
+
+  it("has no agent command without a source path", async () => {
+    const { base } = await serve();
+    expect((await fetch(`${base}/api/command`)).status).toBe(404);
+  });
+
   it("announces the mode over the event stream", async () => {
     const { base } = await serve();
     const res = await fetch(`${base}/api/events`);
@@ -141,6 +166,12 @@ describe("live mode", () => {
     });
     expect(notify.status).toBe(200);
     expect(((await (await fetch(`${base}/api/traces`)).json()) as unknown[]).length).toBe(2);
+
+    const { command } = (await (await fetch(`${base}/api/command?id=run-0`)).json()) as {
+      command: string;
+    };
+    expect(command).toContain(".devtools/generations.json");
+    expect(command).toContain("--run run-0");
 
     const outside = await fetch(`${base}/api/notify`, {
       method: "POST",

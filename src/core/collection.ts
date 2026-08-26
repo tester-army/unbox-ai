@@ -5,6 +5,8 @@ import type { NormalizedTrace, RawTrace } from "./types";
 export interface TraceCollectionItem {
   raw: RawTrace;
   trace: NormalizedTrace;
+  /** Absolute path of the file this run came from; attached by loaders. */
+  sourcePath?: string;
 }
 
 export interface TraceCollection {
@@ -24,6 +26,8 @@ export interface RunSummary {
   inProgress?: boolean;
   /** Nesting level under the spawning run; 0 for roots. */
   depth: number;
+  /** Absolute path of the file this run came from; groups runs into tabs. */
+  source?: string;
 }
 
 /**
@@ -44,7 +48,7 @@ export function parseCollection(json: unknown): TraceCollection {
 
 export function runSummaries(items: TraceCollectionItem[]): RunSummary[] {
   const parents = new Map(items.map(({ trace }) => [trace.traceId, trace.parentTraceId]));
-  return items.map(({ trace }) => ({
+  return items.map(({ trace, sourcePath }) => ({
     id: trace.traceId,
     name: trace.name,
     timestamp: trace.timestamp,
@@ -53,6 +57,7 @@ export function runSummaries(items: TraceCollectionItem[]): RunSummary[] {
     models: trace.models,
     ...(trace.inProgress ? { inProgress: true } : {}),
     depth: depthOf(trace.traceId, parents),
+    ...(sourcePath !== undefined ? { source: sourcePath } : {}),
   }));
 }
 

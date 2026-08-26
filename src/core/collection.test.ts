@@ -64,6 +64,13 @@ describe("runSummaries", () => {
     ]);
   });
 
+  it("passes the source path through for tab grouping", () => {
+    const sourced = { ...item("a"), sourcePath: "/tmp/a.json" };
+    const summaries = runSummaries([sourced, item("b")]);
+    expect(summaries[0]!.source).toBe("/tmp/a.json");
+    expect(summaries[1]!.source).toBeUndefined();
+  });
+
   it("survives lineage cycles", () => {
     const a = item("a", "b");
     const b = item("b", "a");

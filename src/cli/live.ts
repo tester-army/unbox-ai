@@ -26,7 +26,9 @@ export function createLiveSource(defaultDbPath: string): TraceSource & { reload(
       return false; // the app has not written anything yet
     }
     try {
-      snapshot = buildCollection(parseCollection(JSON.parse(text)).items);
+      snapshot = buildCollection(
+        parseCollection(JSON.parse(text)).items.map((item) => ({ ...item, sourcePath: dbPath })),
+      );
     } catch {
       // the app rewrites the file on every step, so a read can catch it
       // mid-write; keep the last good state - the next ping re-reads

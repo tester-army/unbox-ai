@@ -59,6 +59,22 @@ function pickTrace(collection: Collection, url: URL): ServedTrace | undefined {
   return collection.items.at(-1);
 }
 
+/**
+ * The shell command an agent runs to explore this run: the bounded `summary`
+ * entry point, scoped with --run when the source file holds several runs.
+ */
+function agentCommand(items: ServedTrace[], item: ServedTrace): string | undefined {
+  if (item.sourcePath === undefined) return undefined;
+  const multiRun = items.filter((other) => other.sourcePath === item.sourcePath).length > 1;
+  const run = multiRun ? ` --run ${shellQuote(item.trace.traceId)}` : "";
+  return `npx unbox-ai summary ${shellQuote(item.sourcePath)}${run}`;
+}
+
+/** Single-quotes a value unless it is plain enough to paste bare. */
+function shellQuote(value: string): string {
+  return /^[\w@%+=:,./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+}
+
 /** Directory of built viewer assets, shipped next to the bundled CLI. */
 function viewerDir(): string {
   return fileURLToPath(new URL("../viewer", import.meta.url));
@@ -118,6 +134,16 @@ export async function startServer(
       const value = item && resolvePath(item.raw, url.searchParams.get("path") ?? "");
       res.writeHead(value === undefined ? 404 : 200, { "content-type": "application/json" });
       res.end(JSON.stringify(value === undefined ? { error: "nothing at path" } : { value }));
+      return;
+    }
+    if (url.pathname === "/api/command") {
+      const collection = source.current();
+      const item = pickTrace(collection, url);
+      const command = item && agentCommand(collection.items, item);
+      res.writeHead(command === undefined ? 404 : 200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify(command === undefined ? { error: "no command available" } : { command }),
+      );
       return;
     }
     if (url.pathname === "/api/events") {

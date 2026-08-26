@@ -99,6 +99,10 @@ opens several trace files (any mix of formats) as one run list.
 - **Timeline waterfall** - latency per generation with TTFT marks, tokens, cost.
 - **Generation detail** - only the messages new since the previous generation,
   tool calls paired with their results, raw JSON one click away.
+- **File tabs** - `unbox-ai view a.json b.json` opens one tab per file; the
+  sidebar run list scopes to the active tab. Tabs close (x), and the + button
+  or dropping a .json anywhere opens more traces without restarting the
+  server.
 
 Token attribution is estimated (character-proportional, scaled to the reported
 per-generation totals) and labeled as such.
@@ -116,6 +120,10 @@ unbox-ai tools trace.json            # every tool call: status, time, size, args
 unbox-ai messages trace.json --grep "error" --role assistant --limit 10
 unbox-ai get trace.json 'events[5].messages[10].tool_calls[0]'
 ```
+
+In the viewer, **copy for agent** (header, top right) copies the exact
+`summary` command for the run on screen - paste it into your agent to hand
+over what you're looking at.
 
 Every command caps its output; truncations print the exact `get` invocation
 that returns the rest. `--json` gives machine-readable output. When stdout is
