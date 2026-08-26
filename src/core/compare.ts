@@ -59,6 +59,7 @@ const OPTIONAL_METRICS = new Set([
   "cost",
   "prompt wait time",
   "output time",
+  "unattributed time",
   "tool time",
   "reasoning tokens",
 ]);
@@ -79,8 +80,9 @@ function compareMetrics(a: NormalizedTrace, b: NormalizedTrace): ComparedMetric[
       (acc, segment) => ({
         wait: acc.wait + segment.promptWait,
         output: acc.output + segment.generation,
+        unattributed: acc.unattributed + segment.unattributed,
       }),
-      { wait: 0, output: 0 },
+      { wait: 0, output: 0, unattributed: 0 },
     );
   const share = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
   const timeA = modelTime(ia);
@@ -96,6 +98,14 @@ function compareMetrics(a: NormalizedTrace, b: NormalizedTrace): ComparedMetric[
     // producing tokens (thinking included - traces carry no finer split)
     { key: "prompt wait time", kind: "seconds", a: timeA.wait, b: timeB.wait },
     { key: "output time", kind: "seconds", a: timeA.output, b: timeB.output },
+    // generations that report no ttft (reasoning models often don't) land
+    // here - this is where hidden thinking time shows up
+    {
+      key: "unattributed time",
+      kind: "seconds",
+      a: timeA.unattributed,
+      b: timeB.unattributed,
+    },
     { key: "tool time", kind: "seconds", a: toolSeconds(callsA), b: toolSeconds(callsB) },
     { key: "cost", kind: "cost", a: a.totalCost, b: b.totalCost },
     {
