@@ -1,6 +1,7 @@
 import type { RunSummary } from "@core/collection";
 import {
   type ComparableTrace,
+  type ComparedMetric,
   compareTraces,
   metricDelta,
   metricValue,
@@ -135,33 +136,72 @@ function MetricsGrid({ comparison }: { comparison: TraceComparison }) {
           : `totals · A: ${models.a.join(", ")} · B: ${models.b.join(", ")}`
       }
     >
-      <div className="type-accent-s grid max-w-2xl grid-cols-[1fr_auto_auto_auto] gap-x-8 gap-y-1.5">
-        <HeaderCell>metric</HeaderCell>
-        <HeaderCell right>A</HeaderCell>
-        <HeaderCell right>B</HeaderCell>
-        <HeaderCell right>delta</HeaderCell>
-        {metrics.map((m) => {
-          const delta = metricDelta(m);
-          return (
-            <div key={m.key} className="contents">
-              <span className="text-ta-grey-200">{m.key}</span>
-              <span className="text-right text-ta-grey-100">{metricValue(m.kind, m.a)}</span>
-              <span className="text-right text-ta-grey-100">{metricValue(m.kind, m.b)}</span>
-              <span
-                className={cn("text-right", delta === "=" ? "text-ta-grey-300" : "text-ta-sand-50")}
-              >
-                {delta}
-              </span>
-            </div>
-          );
-        })}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
+        {metrics.map((m) => (
+          <MetricTile key={m.key} metric={m} />
+        ))}
       </div>
     </Section>
   );
 }
 
-function HeaderCell({ children, right }: { children: React.ReactNode; right?: boolean }) {
-  return <span className={cn("text-ta-grey-300", right && "text-right")}>{children}</span>;
+/** One headline metric as a stat tile: name, prominent delta, A/B bars and values. */
+function MetricTile({ metric }: { metric: ComparedMetric }) {
+  const delta = metricDelta(metric);
+  return (
+    <div className="flex flex-col gap-2.5 border border-ta-grey-400 bg-ta-grey-450/40 px-4 py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="type-accent-s text-ta-grey-200">{metric.key}</span>
+        <span
+          className={cn("type-accent-m", delta === "=" ? "text-ta-grey-300" : "text-ta-sand-50")}
+        >
+          {delta}
+        </span>
+      </div>
+      <MetricBars metric={metric} />
+      <div className="type-accent-s flex justify-between gap-3 text-ta-grey-100">
+        <span>
+          <SeriesChip className="bg-ta-grey-300" /> A {metricValue(metric.kind, metric.a)}
+        </span>
+        <span>
+          <SeriesChip className="bg-ta-orange-300" /> B {metricValue(metric.kind, metric.b)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Ties a bar's series color to its value column. */
+function SeriesChip({ className }: { className: string }) {
+  return <span aria-hidden className={cn("mr-1 inline-block size-1.5 align-middle", className)} />;
+}
+
+/**
+ * Paired A/B bars per metric. Each row scales to its own max - tokens,
+ * dollars, and seconds share no axis - except shares, which scale to 100%
+ * so the bar length is the honest ratio. A is the neutral reference, B the
+ * accent; identity is also carried by position and the labeled columns.
+ */
+function MetricBars({ metric }: { metric: ComparedMetric }) {
+  const scale = metric.kind === "share" ? 1 : Math.max(metric.a, metric.b);
+  const width = (v: number) => (scale <= 0 || v <= 0 ? "0%" : `${Math.max((v / scale) * 100, 2)}%`);
+  return (
+    <div
+      className="flex min-w-16 flex-col gap-0.5"
+      title={`A ${metricValue(metric.kind, metric.a)} · B ${metricValue(metric.kind, metric.b)}`}
+    >
+      <Bar className="bg-ta-grey-300" width={width(metric.a)} />
+      <Bar className="bg-ta-orange-300" width={width(metric.b)} />
+    </div>
+  );
+}
+
+function Bar({ className, width }: { className: string; width: string }) {
+  return (
+    <div className="h-[5px] w-full bg-ta-grey-450">
+      <div className={cn("h-full", className)} style={{ width }} />
+    </div>
+  );
 }
 
 const ROW_GRID = "grid grid-cols-[4.5rem_1fr_1fr] gap-x-4";
