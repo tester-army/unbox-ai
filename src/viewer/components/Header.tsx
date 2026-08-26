@@ -8,11 +8,14 @@ interface HeaderProps {
   trace: NormalizedTrace;
   /** Shell command an agent runs to explore this run from the CLI. */
   agentCommand?: string;
+  /** Present when at least two runs exist; toggles the A/B compare view. */
+  onCompare?: () => void;
+  comparing?: boolean;
   /** Present in live devtools mode; empties the backing database. */
   onClear?: () => void;
 }
 
-export function Header({ trace, agentCommand, onClear }: HeaderProps) {
+export function Header({ trace, agentCommand, onCompare, comparing, onClear }: HeaderProps) {
   return (
     <header className="flex items-baseline gap-6 overflow-hidden border-b border-ta-grey-400 px-6 py-4">
       <h1 className="type-accent-m shrink-0 text-ta-orange-300">unbox-ai</h1>
@@ -34,14 +37,19 @@ export function Header({ trace, agentCommand, onClear }: HeaderProps) {
         />
         {/* traces without price data report 0 - a real run never costs exactly $0 */}
         {trace.totalCost > 0 && <Stat label="cost" value={formatCost(trace.totalCost)} />}
+        {onCompare && (
+          <Button
+            onClick={onCompare}
+            aria-pressed={comparing}
+            className={comparing ? "border-ta-orange-300 text-ta-orange-300" : undefined}
+          >
+            compare
+          </Button>
+        )}
         {agentCommand ? (
           <CopyButton label="copy for agent" text={agentCommand} title={agentCommand} />
         ) : (
-          <Button
-            disabled
-            className="cursor-default opacity-40 hover:border-ta-grey-400 hover:text-ta-grey-100"
-            title="opened in this browser - agents need a file on disk"
-          >
+          <Button disabled title="opened in this browser - agents need a file on disk">
             copy for agent
           </Button>
         )}

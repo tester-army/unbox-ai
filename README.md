@@ -119,7 +119,18 @@ unbox-ai event trace.json 5          # one generation, new messages only
 unbox-ai tools trace.json            # every tool call: status, time, size, args
 unbox-ai messages trace.json --grep "error" --role assistant --limit 10
 unbox-ai get trace.json 'events[5].messages[10].tool_calls[0]'
+unbox-ai compare a.json b.json       # A/B two runs: metric deltas + system prompt / tool diff
 ```
+
+`compare` is built for prompt and model A/B: it prints token / cost / time /
+cache deltas, then a line diff of the system prompt and the added / removed /
+changed tool definitions - "what changed and what did it buy". Add
+`--trajectory` for a content-aligned action table (LCS over tool sequences,
+so an extra step in one run offsets nothing) that marks exactly which steps
+differ. Two runs of one file: `unbox-ai compare db.json --run 0
+--run 1`. The viewer has the same thing interactively: a **compare** button
+(2+ runs) opens a side-by-side trajectory where each aligned generation
+expands into both runs' messages.
 
 In the viewer, **copy for agent** (header, top right) copies the exact
 `summary` command for the run on screen - paste it into your agent to hand

@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runSummaries, type TraceCollectionItem } from "../core/collection";
+import { collectToolDefs } from "../core/compare";
 import { resolvePath } from "../core/path";
 
 const MIME: Record<string, string> = {
@@ -134,6 +135,14 @@ export async function startServer(
       const value = item && resolvePath(item.raw, url.searchParams.get("path") ?? "");
       res.writeHead(value === undefined ? 404 : 200, { "content-type": "application/json" });
       res.end(JSON.stringify(value === undefined ? { error: "nothing at path" } : { value }));
+      return;
+    }
+    if (url.pathname === "/api/tools") {
+      const item = pickTrace(source.current(), url);
+      res.writeHead(item ? 200 : 404, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify(item ? { tools: collectToolDefs(item.raw) } : { error: "no traces yet" }),
+      );
       return;
     }
     if (url.pathname === "/api/command") {

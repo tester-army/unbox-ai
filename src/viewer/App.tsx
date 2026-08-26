@@ -1,6 +1,7 @@
 import type { RunSummary } from "@core/collection";
 import type { NormalizedTrace } from "@core/types";
 import { useEffect, useRef, useState } from "react";
+import { CompareView } from "@/components/CompareView";
 import { GenerationDetail } from "@/components/GenerationDetail";
 import { Header } from "@/components/Header";
 import { ReplayBar } from "@/components/ReplayBar";
@@ -12,6 +13,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { Waterfall } from "@/components/Waterfall";
 import { useReplay } from "@/lib/use-replay";
 import { useTrace } from "@/lib/use-trace";
+import { cn } from "@/lib/utils";
 
 export function App() {
   const {
@@ -113,6 +115,7 @@ function Loaded({
   onSelect,
 }: LoadedProps) {
   const replay = useReplay(trace);
+  const [comparing, setComparing] = useState(false);
 
   // several opened files become tabs; devtools' live feed stays a plain list
   const tabs = live ? [] : sourceTabs(runs);
@@ -164,9 +167,18 @@ function Loaded({
       <Header
         trace={trace}
         agentCommand={agentCommand}
+        onCompare={runs.length > 1 ? () => setComparing((v) => !v) : undefined}
+        comparing={comparing}
         onClear={live ? () => void fetch("/api/clear", { method: "POST" }) : undefined}
       />
-      {tabs.length > 0 && (
+      {comparing && (
+        <CompareView
+          runs={runs}
+          initialA={selectedRun ?? trace.traceId}
+          onClose={() => setComparing(false)}
+        />
+      )}
+      {!comparing && tabs.length > 0 && (
         <SourceTabs
           tabs={tabs}
           selectedSource={selectedSource}
@@ -176,7 +188,7 @@ function Loaded({
           openError={openError}
         />
       )}
-      <div className="flex min-h-0 flex-1">
+      <div className={cn("flex min-h-0 flex-1", comparing && "hidden")}>
         {/* stable gutters: a scrollbar appearing mid-stream must not shift the layout */}
         <aside className="w-80 shrink-0 overflow-y-auto border-r border-ta-grey-400 [scrollbar-gutter:stable]">
           {scopedRuns.length > 1 && (

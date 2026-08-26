@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import type { MessageRole } from "../core/types";
+import { compare } from "./commands/compare";
 import { event } from "./commands/event";
 import { events } from "./commands/events";
 import { get } from "./commands/get";
@@ -27,10 +28,14 @@ Usage:
   unbox-ai tools <trace.json>            tool usage summary (--all for every call)
   unbox-ai messages <trace.json>         search messages (--role, --event, --grep, --limit)
   unbox-ai get <trace.json> <path>       raw value at a path, e.g. events[3].messages[2].content
+  unbox-ai compare <a.json> <b.json>     metric deltas + system prompt / tool diff between two
+                                         traces (one file, two runs: --run <x> --run <y>)
 
 Options:
   --json          machine-readable output, unbounded (summary, events, event, messages)
-  --run <n|id>    scope a text command to one run of a multi-run source (see: runs)
+  --run <n|id>    scope a text command to one run of a multi-run source (see: runs);
+                  compare takes it twice - first scopes A, second scopes B
+  --trajectory    compare only: aligned per-generation action table (* = diverged)
   --port <n>      server port (view default 4177; devtools default 4983)
   --no-open       start the server without opening a browser
   --role <r>      filter: system | user | assistant | tool-result | unknown
@@ -51,6 +56,7 @@ const COMMANDS = new Set([
   "tools",
   "messages",
   "get",
+  "compare",
 ]);
 
 const ROLES: MessageRole[] = ["system", "user", "assistant", "tool-result", "unknown"];
@@ -59,7 +65,8 @@ function main(): void {
   const { values, positionals } = parseArgs({
     options: {
       json: { type: "boolean", default: false },
-      run: { type: "string" },
+      run: { type: "string", multiple: true },
+      trajectory: { type: "boolean", default: false },
       port: { type: "string" },
       "no-open": { type: "boolean", default: false },
       all: { type: "boolean", default: false },
@@ -102,9 +109,20 @@ function main(): void {
     runs(loadCollectionFiles(paths), values.json);
     return;
   }
+  if (command === "compare") {
+    compareCommand(paths, values.run ?? [], {
+      json: values.json,
+      trajectory: values.trajectory,
+    });
+    return;
+  }
 
-  if (values.run !== undefined) setTraceRef(`<trace> --run ${values.run}`);
-  const loaded = values.run !== undefined ? loadRun(tracePath, values.run) : loadTrace(tracePath);
+  const run = values.run?.[0];
+  if (values.run !== undefined && values.run.length > 1) {
+    fail(`--run can be given once for ${command}; twice is for compare`);
+  }
+  if (run !== undefined) setTraceRef(`<trace> --run ${run}`);
+  const loaded = run !== undefined ? loadRun(tracePath, run) : loadTrace(tracePath);
 
   switch (command) {
     case "summary":
@@ -136,6 +154,26 @@ function main(): void {
       get(loaded, arg);
       return;
   }
+}
+
+/** Resolves compare's A and B sides: two files, or one file with two --run selectors. */
+function compareCommand(
+  paths: string[],
+  runSelectors: string[],
+  options: { json: boolean; trajectory: boolean },
+): void {
+  if (runSelectors.length > 2) fail("--run can be given at most twice for compare");
+  const [pathA, pathB] = paths;
+  if (pathB === undefined && runSelectors.length !== 2) {
+    fail("compare needs two files, or one file with --run <x> --run <y> (see: runs)");
+  }
+  const load = (path: string, selector: string | undefined) => ({
+    loaded: selector !== undefined ? loadRun(path, selector) : loadTrace(path),
+    label: selector !== undefined ? `${path} --run ${selector}` : path,
+  });
+  const a = load(pathA!, runSelectors[0]);
+  const b = load(pathB ?? pathA!, runSelectors[1]);
+  compare(a.loaded, b.loaded, { a: a.label, b: b.label }, options);
 }
 
 /** Bare `unbox-ai trace.json` opens the browser for humans, prints summary for pipes. */
