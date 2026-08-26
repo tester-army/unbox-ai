@@ -1,8 +1,8 @@
 import { type DiffLine, diffLines } from "./diff";
 import { formatCost, formatSeconds, formatTokens } from "./format";
 import { computeInsights } from "./insights";
-import { allToolCalls } from "./normalize";
-import type { NormalizedTrace, RawToolDef, RawTrace } from "./types";
+import { allToolCalls, toolCallNames } from "./normalize";
+import type { Generation, NormalizedTrace, RawToolDef, RawTrace } from "./types";
 
 /** One side of a comparison: the normalized trace plus its raw form. */
 export interface ComparableTrace {
@@ -139,6 +139,39 @@ function compareTools(a: Map<string, RawToolDef>, b: Map<string, RawToolDef>): T
 
 function defKey(def: RawToolDef): string {
   return JSON.stringify({ description: def.description, inputSchema: def.inputSchema });
+}
+
+export interface TrajectoryStep {
+  index: number;
+  a?: Generation;
+  b?: Generation;
+  /** Both sides exist and took a different action (tool sequence or text-only). */
+  diverged: boolean;
+}
+
+/**
+ * Pairs the runs' generations index by index - the honest v1 alignment.
+ * A missing side marks the shorter run's tail; divergence marks steps
+ * where the runs called different tools (or one answered in text).
+ */
+export function pairTrajectory(a: NormalizedTrace, b: NormalizedTrace): TrajectoryStep[] {
+  const length = Math.max(a.generations.length, b.generations.length);
+  return Array.from({ length }, (_, index) => {
+    const genA = a.generations[index];
+    const genB = b.generations[index];
+    return {
+      index,
+      ...(genA !== undefined ? { a: genA } : {}),
+      ...(genB !== undefined ? { b: genB } : {}),
+      diverged: genA !== undefined && genB !== undefined && actionKey(genA) !== actionKey(genB),
+    };
+  });
+}
+
+/** What a generation did: its tool calls in order, or a plain text response. */
+export function actionKey(gen: Generation): string {
+  const tools = toolCallNames(gen);
+  return tools.length > 0 ? tools.join(",") : "text";
 }
 
 /** One metric value rendered for its kind, shared by the CLI table and the viewer. */

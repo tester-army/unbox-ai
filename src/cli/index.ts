@@ -35,6 +35,7 @@ Options:
   --json          machine-readable output, unbounded (summary, events, event, messages)
   --run <n|id>    scope a text command to one run of a multi-run source (see: runs);
                   compare takes it twice - first scopes A, second scopes B
+  --trajectory    compare only: aligned per-generation action table (* = diverged)
   --port <n>      server port (view default 4177; devtools default 4983)
   --no-open       start the server without opening a browser
   --role <r>      filter: system | user | assistant | tool-result | unknown
@@ -65,6 +66,7 @@ function main(): void {
     options: {
       json: { type: "boolean", default: false },
       run: { type: "string", multiple: true },
+      trajectory: { type: "boolean", default: false },
       port: { type: "string" },
       "no-open": { type: "boolean", default: false },
       all: { type: "boolean", default: false },
@@ -108,7 +110,10 @@ function main(): void {
     return;
   }
   if (command === "compare") {
-    compareCommand(paths, values.run ?? [], values.json);
+    compareCommand(paths, values.run ?? [], {
+      json: values.json,
+      trajectory: values.trajectory,
+    });
     return;
   }
 
@@ -152,7 +157,11 @@ function main(): void {
 }
 
 /** Resolves compare's A and B sides: two files, or one file with two --run selectors. */
-function compareCommand(paths: string[], runSelectors: string[], json: boolean): void {
+function compareCommand(
+  paths: string[],
+  runSelectors: string[],
+  options: { json: boolean; trajectory: boolean },
+): void {
   if (runSelectors.length > 2) fail("--run can be given at most twice for compare");
   const [pathA, pathB] = paths;
   const load = (path: string, selector: string | undefined) => ({
@@ -165,12 +174,12 @@ function compareCommand(paths: string[], runSelectors: string[], json: boolean):
     }
     const a = load(pathA!, runSelectors[0]);
     const b = load(pathA!, runSelectors[1]);
-    compare(a.loaded, b.loaded, { a: a.label, b: b.label }, json);
+    compare(a.loaded, b.loaded, { a: a.label, b: b.label }, options);
     return;
   }
   const a = load(pathA!, runSelectors[0]);
   const b = load(pathB, runSelectors[1]);
-  compare(a.loaded, b.loaded, { a: a.label, b: b.label }, json);
+  compare(a.loaded, b.loaded, { a: a.label, b: b.label }, options);
 }
 
 /** Bare `unbox-ai trace.json` opens the browser for humans, prints summary for pipes. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareTraces } from "./compare";
+import { compareTraces, pairTrajectory } from "./compare";
 import { diffLines } from "./diff";
 import { normalizeTrace } from "./normalize";
 import type { RawToolDef, RawTrace } from "./types";
@@ -107,6 +107,32 @@ describe("compareTraces", () => {
       changed: ["edit"],
       unchanged: 1,
     });
+  });
+});
+
+describe("pairTrajectory", () => {
+  it("aligns by index, marks divergence and missing tails", () => {
+    const withTool = (id: string, events: number, tool?: string): RawTrace => {
+      const raw = rawTrace({ id, events });
+      if (tool !== undefined) {
+        raw.events[0]!.messages.push({
+          role: "assistant",
+          content: "",
+          tool_calls: [{ type: "function", id: "c1", function: { name: tool, arguments: {} } }],
+        });
+      }
+      return raw;
+    };
+    const steps = pairTrajectory(
+      normalizeTrace(withTool("a", 2, "search")),
+      normalizeTrace(withTool("b", 3, "fetch")),
+    );
+    expect(steps).toHaveLength(3);
+    expect(steps[0]!.diverged).toBe(true);
+    expect(steps[1]!.diverged).toBe(false);
+    expect(steps[2]!.a).toBeUndefined();
+    expect(steps[2]!.b).toBeDefined();
+    expect(steps[2]!.diverged).toBe(false);
   });
 });
 

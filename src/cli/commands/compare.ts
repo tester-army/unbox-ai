@@ -3,9 +3,14 @@ import {
   metricDelta,
   metricValue,
   type PromptDiff,
+  pairTrajectory,
   type ToolsDiff,
+  type TrajectoryStep,
 } from "../../core/compare";
 import type { DiffLine } from "../../core/diff";
+import { formatCallNames, formatSeconds, formatTokens } from "../../core/format";
+import { toolCallNames } from "../../core/normalize";
+import type { Generation } from "../../core/types";
 import type { LoadedTrace } from "../load";
 import { printJson, table } from "../output";
 
@@ -19,11 +24,22 @@ export function compare(
   a: LoadedTrace,
   b: LoadedTrace,
   labels: { a: string; b: string },
-  json: boolean,
+  options: { json: boolean; trajectory: boolean },
 ): void {
   const comparison = compareTraces(a, b);
-  if (json) {
-    printJson({ a: side(a, labels.a), b: side(b, labels.b), ...comparison });
+  const steps = pairTrajectory(a.trace, b.trace);
+  if (options.json) {
+    printJson({
+      a: side(a, labels.a),
+      b: side(b, labels.b),
+      ...comparison,
+      trajectory: steps.map((step) => ({
+        index: step.index,
+        diverged: step.diverged,
+        a: stepJson(step.a),
+        b: stepJson(step.b),
+      })),
+    });
     return;
   }
   console.log(`A  ${a.trace.name}  (${labels.a})`);
@@ -49,6 +65,46 @@ export function compare(
   console.log("");
   printPromptDiff(comparison.systemPrompt);
   printToolsDiff(comparison.tools);
+  if (options.trajectory) {
+    console.log("");
+    printTrajectory(steps);
+  } else if (steps.some((step) => step.diverged || step.a === undefined || step.b === undefined)) {
+    const at = steps.find((s) => s.diverged || s.a === undefined || s.b === undefined)!.index;
+    console.log(`\ntrajectories differ from generation ${at} - see: --trajectory`);
+  }
+}
+
+function stepJson(gen: Generation | undefined) {
+  if (gen === undefined) return null;
+  return {
+    tools: toolCallNames(gen),
+    inputTokens: gen.metrics.inputTokens,
+    outputTokens: gen.metrics.outputTokens,
+    latency: gen.metrics.latency,
+  };
+}
+
+/** Aligned per-generation actions; "*" marks steps where the runs did different things. */
+function printTrajectory(steps: TrajectoryStep[]): void {
+  console.log("trajectory (aligned by generation · * = different action)");
+  console.log(
+    table(
+      ["gen", "", "A", "B"],
+      steps.map((step) => [
+        String(step.index),
+        step.diverged ? "*" : "",
+        actionCell(step.a),
+        actionCell(step.b),
+      ]),
+    ),
+  );
+}
+
+function actionCell(gen: Generation | undefined): string {
+  if (gen === undefined) return "-";
+  const calls = formatCallNames(toolCallNames(gen));
+  const doing = calls !== "" ? calls : `-> ${(gen.newMessages.at(-1)?.text ?? "").slice(0, 32)}`;
+  return `${doing}  ${formatTokens(gen.metrics.inputTokens)} in ${formatSeconds(gen.metrics.latency)}`;
 }
 
 function side(loaded: LoadedTrace, label: string) {

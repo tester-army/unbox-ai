@@ -4,38 +4,45 @@ import {
   compareTraces,
   metricDelta,
   metricValue,
+  pairTrajectory,
   type TraceComparison,
+  type TrajectoryStep,
 } from "@core/compare";
-import type { NormalizedTrace, RawTrace } from "@core/types";
-import { useEffect, useState } from "react";
+import { formatCallNames, formatSeconds, formatTokens } from "@core/format";
+import { toolCallNames } from "@core/normalize";
+import type { Generation, NormalizedTrace, RawTrace } from "@core/types";
+import { useEffect, useMemo, useState } from "react";
+import { MessageCard } from "@/components/MessageCard";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { localTraceItem } from "@/lib/use-trace";
 import { cn } from "@/lib/utils";
 
-interface CompareDialogProps {
+interface CompareViewProps {
   runs: RunSummary[];
   /** Run preselected as side A, normally the one on screen. */
   initialA: string;
   onClose: () => void;
 }
 
-/** A/B comparison of two runs: metric deltas, system prompt diff, tool-set diff. */
-export function CompareDialog({ runs, initialA, onClose }: CompareDialogProps) {
+/**
+ * Full-pane A/B exploration: aligned per-generation trajectory with
+ * expandable message detail, headline deltas, prompt and tool diffs.
+ */
+export function CompareView({ runs, initialA, onClose }: CompareViewProps) {
   const [aId, setAId] = useState(initialA);
   const [bId, setBId] = useState(
     () => (runs.find((run) => run.id !== initialA) ?? runs[0])?.id ?? initialA,
   );
-  const [comparison, setComparison] = useState<TraceComparison>();
+  const [sides, setSides] = useState<{ a: ComparableTrace; b: ComparableTrace }>();
   const [error, setError] = useState<string>();
 
   useEffect(() => {
     let stale = false;
-    setComparison(undefined);
+    setSides(undefined);
     setError(undefined);
     Promise.all([loadSide(aId), loadSide(bId)])
       .then(([a, b]) => {
-        if (!stale) setComparison(compareTraces(a, b));
+        if (!stale) setSides({ a, b });
       })
       .catch((cause) => {
         if (!stale) setError(String(cause));
@@ -45,27 +52,40 @@ export function CompareDialog({ runs, initialA, onClose }: CompareDialogProps) {
     };
   }, [aId, bId]);
 
+  const comparison = useMemo(
+    () => (sides !== undefined ? compareTraces(sides.a, sides.b) : undefined),
+    [sides],
+  );
+  const steps = useMemo(
+    () => (sides !== undefined ? pairTrajectory(sides.a.trace, sides.b.trace) : undefined),
+    [sides],
+  );
+
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
-        <div className="flex items-center gap-3 border-b border-ta-grey-400 px-5 py-3">
-          <DialogTitle>compare runs</DialogTitle>
-          <DialogClose render={<Button className="ml-auto border-none">close</Button>} />
-        </div>
-        <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-5 py-4">
-          <div className="flex items-center gap-3">
-            <RunSelect side="A" runs={runs} value={aId} onChange={setAId} />
-            <span className="type-accent-s text-ta-grey-300">vs</span>
-            <RunSelect side="B" runs={runs} value={bId} onChange={setBId} />
-          </div>
-          {error && <p className="type-body-s text-ta-error">Failed to compare: {error}</p>}
-          {!error && !comparison && (
-            <p className="type-accent-s text-ta-grey-200">loading runs...</p>
-          )}
-          {comparison && <Comparison comparison={comparison} />}
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center gap-3 border-b border-ta-grey-400 px-6 py-3">
+        <RunSelect side="A" runs={runs} value={aId} onChange={setAId} />
+        <span className="type-accent-s shrink-0 text-ta-grey-300">vs</span>
+        <RunSelect side="B" runs={runs} value={bId} onChange={setBId} />
+        <Button className="shrink-0" onClick={onClose}>
+          close
+        </Button>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-5 [scrollbar-gutter:stable]">
+        {error && <p className="type-body-s text-ta-error">Failed to compare: {error}</p>}
+        {!error && comparison === undefined && (
+          <p className="type-accent-s text-ta-grey-200">loading runs...</p>
+        )}
+        {comparison && steps && (
+          <>
+            <MetricsGrid comparison={comparison} />
+            <Trajectory steps={steps} />
+            <PromptSection prompt={comparison.systemPrompt} />
+            <ToolsSection tools={comparison.tools} />
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -104,20 +124,18 @@ function runLabel(run: RunSummary): string {
   return base !== undefined ? `${base} · ${run.name}` : run.name;
 }
 
-function Comparison({ comparison }: { comparison: TraceComparison }) {
-  const { models, metrics, systemPrompt, tools } = comparison;
+function MetricsGrid({ comparison }: { comparison: TraceComparison }) {
+  const { models, metrics } = comparison;
   const sameModels = models.a.join(", ") === models.b.join(", ");
   return (
-    <>
-      <p className="type-accent-s text-ta-grey-200">
-        models{" "}
-        <span className="text-ta-sand-50">
-          {sameModels
-            ? models.a.join(", ")
-            : `A: ${models.a.join(", ")}  B: ${models.b.join(", ")}`}
-        </span>
-      </p>
-      <div className="type-accent-s grid grid-cols-[1fr_auto_auto_auto] gap-x-6 gap-y-1.5">
+    <Section
+      label={
+        sameModels
+          ? `totals · ${models.a.join(", ")}`
+          : `totals · A: ${models.a.join(", ")} · B: ${models.b.join(", ")}`
+      }
+    >
+      <div className="type-accent-s grid max-w-2xl grid-cols-[1fr_auto_auto_auto] gap-x-8 gap-y-1.5">
         <HeaderCell>metric</HeaderCell>
         <HeaderCell right>A</HeaderCell>
         <HeaderCell right>B</HeaderCell>
@@ -138,9 +156,7 @@ function Comparison({ comparison }: { comparison: TraceComparison }) {
           );
         })}
       </div>
-      <PromptSection prompt={systemPrompt} />
-      <ToolsSection tools={tools} />
-    </>
+    </Section>
   );
 }
 
@@ -148,7 +164,101 @@ function HeaderCell({ children, right }: { children: React.ReactNode; right?: bo
   return <span className={cn("text-ta-grey-300", right && "text-right")}>{children}</span>;
 }
 
-/** Full diff is rendered; the dialog body scrolls. */
+const ROW_GRID = "grid grid-cols-[3rem_1fr_1fr] gap-x-4";
+
+function Trajectory({ steps }: { steps: TrajectoryStep[] }) {
+  const [expanded, setExpanded] = useState<number>();
+  const firstDifference = steps.find(
+    (step) => step.diverged || step.a === undefined || step.b === undefined,
+  )?.index;
+  return (
+    <Section
+      label={
+        firstDifference === undefined
+          ? "trajectory · aligned by generation · same actions throughout"
+          : `trajectory · aligned by generation · differs from [${firstDifference}]`
+      }
+    >
+      <div className="border border-ta-grey-400">
+        <div
+          className={cn(
+            ROW_GRID,
+            "type-accent-s border-b border-ta-grey-400 px-4 py-2 text-ta-grey-300",
+          )}
+        >
+          <span>gen</span>
+          <span>A</span>
+          <span>B</span>
+        </div>
+        {steps.map((step) => (
+          <div key={step.index} className="border-b border-ta-grey-400 last:border-b-0">
+            <button
+              type="button"
+              onClick={() => setExpanded(expanded === step.index ? undefined : step.index)}
+              aria-expanded={expanded === step.index}
+              className={cn(
+                ROW_GRID,
+                "type-accent-s w-full cursor-pointer px-4 py-2 text-left transition-colors hover:bg-ta-grey-450",
+                expanded === step.index && "bg-ta-grey-450",
+              )}
+            >
+              <span className={step.diverged ? "text-ta-orange-300" : "text-ta-grey-300"}>
+                {step.index}
+                {step.diverged && " *"}
+              </span>
+              <GenCell gen={step.a} diverged={step.diverged} />
+              <GenCell gen={step.b} diverged={step.diverged} />
+            </button>
+            {expanded === step.index && (
+              <div
+                className={cn(ROW_GRID, "border-t border-ta-grey-400 bg-ta-grey-450/40 px-4 py-3")}
+              >
+                <span />
+                <GenDetail gen={step.a} />
+                <GenDetail gen={step.b} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function GenCell({ gen, diverged }: { gen?: Generation; diverged: boolean }) {
+  if (gen === undefined) return <span className="text-ta-grey-300">-</span>;
+  const calls = formatCallNames(toolCallNames(gen));
+  const doing = calls !== "" ? calls : `-> ${(gen.newMessages.at(-1)?.text ?? "").slice(0, 80)}`;
+  return (
+    <span className="flex min-w-0 items-baseline gap-3">
+      <span className={cn("min-w-0 truncate", diverged ? "text-ta-orange-75" : "text-ta-grey-100")}>
+        {doing}
+      </span>
+      <span className="ml-auto shrink-0 text-ta-grey-300">
+        {formatTokens(gen.metrics.inputTokens)} in · {formatSeconds(gen.metrics.latency)}
+      </span>
+    </span>
+  );
+}
+
+/** One side's new messages for the expanded generation. */
+function GenDetail({ gen }: { gen?: Generation }) {
+  if (gen === undefined) {
+    return <p className="type-accent-s text-ta-grey-300">no generation on this side</p>;
+  }
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      {gen.newMessages.map((message) => (
+        <MessageCard key={message.index} message={message} />
+      ))}
+      {gen.newMessages.length === 0 && (
+        <p className="type-accent-s text-ta-grey-300">no new messages</p>
+      )}
+    </div>
+  );
+}
+
+/** Full diff is rendered; the pane scrolls. */
 const MAX_RENDERED_DIFF_LINES = 600;
 
 function PromptSection({ prompt }: { prompt: TraceComparison["systemPrompt"] }) {
