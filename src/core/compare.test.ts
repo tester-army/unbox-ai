@@ -53,6 +53,32 @@ describe("compareTraces", () => {
     expect(metric("input tokens")).toMatchObject({ a: 200, b: 150 });
   });
 
+  it("adds time-split rows only when the traces report the data", () => {
+    const timed: RawTrace = rawTrace({ id: "a" });
+    timed.events[0]!.metrics.latency = 5;
+    timed.events[0]!.metrics.time_to_first_token = 3;
+    timed.events[0]!.metrics.tokens.reasoning = 7;
+    timed.events[0]!.messages.push(
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [{ type: "function", id: "c1", function: { name: "wait", arguments: {} } }],
+      },
+      { role: "tool", tool_call_id: "c1", content: "done", duration_ms: 2000 },
+    );
+    const comparison = compareTraces(side(timed), side(timed));
+    const metric = (key: string) => comparison.metrics.find((m) => m.key === key);
+    expect(metric("prompt wait time")).toMatchObject({ a: 3, b: 3 });
+    expect(metric("output time")).toMatchObject({ a: 2, b: 2 });
+    expect(metric("tool time")).toMatchObject({ a: 2, b: 2 });
+    expect(metric("reasoning tokens")).toMatchObject({ a: 7, b: 7 });
+
+    const bare = compareTraces(side(rawTrace({ id: "a" })), side(rawTrace({ id: "b" })));
+    for (const key of ["prompt wait time", "output time", "tool time", "reasoning tokens"]) {
+      expect(bare.metrics.some((m) => m.key === key)).toBe(false);
+    }
+  });
+
   it("hides the cost row when neither trace reports prices", () => {
     const free = compareTraces(side(rawTrace({ id: "a" })), side(rawTrace({ id: "b" })));
     expect(free.metrics.some((m) => m.key === "cost")).toBe(false);

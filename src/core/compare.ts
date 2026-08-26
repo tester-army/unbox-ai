@@ -1,6 +1,6 @@
 import { type DiffLine, diffLines } from "./diff";
 import { formatCost, formatSeconds, formatTokens } from "./format";
-import { computeInsights } from "./insights";
+import { computeInsights, type Insights } from "./insights";
 import { allToolCalls, toolCallNames } from "./normalize";
 import type { Generation, NormalizedTrace, RawToolDef, RawTrace } from "./types";
 
@@ -54,6 +54,15 @@ export function compareTraces(a: ComparableTrace, b: ComparableTrace): TraceComp
   };
 }
 
+/** Rows that only exist when the traces report the data; hidden when both sides are 0. */
+const OPTIONAL_METRICS = new Set([
+  "cost",
+  "prompt wait time",
+  "output time",
+  "tool time",
+  "reasoning tokens",
+]);
+
 function compareMetrics(a: NormalizedTrace, b: NormalizedTrace): ComparedMetric[] {
   const ia = computeInsights(a);
   const ib = computeInsights(b);
@@ -61,13 +70,33 @@ function compareMetrics(a: NormalizedTrace, b: NormalizedTrace): ComparedMetric[
   const callsB = allToolCalls(b);
   const failures = (calls: { success?: boolean }[]) =>
     calls.filter((call) => call.success === false).length;
+  const toolSeconds = (calls: { durationMs?: number }[]) =>
+    calls.reduce((ms, call) => ms + (call.durationMs ?? 0), 0) / 1000;
+  const reasoning = (trace: NormalizedTrace) =>
+    trace.generations.reduce((sum, gen) => sum + (gen.metrics.reasoningTokens ?? 0), 0);
+  const modelTime = (insights: Insights) =>
+    insights.perSegment.reduce(
+      (acc, segment) => ({
+        wait: acc.wait + segment.promptWait,
+        output: acc.output + segment.generation,
+      }),
+      { wait: 0, output: 0 },
+    );
   const share = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
+  const timeA = modelTime(ia);
+  const timeB = modelTime(ib);
   const metrics: ComparedMetric[] = [
     { key: "generations", kind: "count", a: a.generations.length, b: b.generations.length },
     { key: "segments", kind: "count", a: a.segmentCount, b: b.segmentCount },
     { key: "input tokens", kind: "tokens", a: a.totalTokens.input, b: b.totalTokens.input },
     { key: "output tokens", kind: "tokens", a: a.totalTokens.output, b: b.totalTokens.output },
+    { key: "reasoning tokens", kind: "tokens", a: reasoning(a), b: reasoning(b) },
     { key: "model time", kind: "seconds", a: a.totalLatency, b: b.totalLatency },
+    // ttft-attributed split of model time: waiting for the first token vs
+    // producing tokens (thinking included - traces carry no finer split)
+    { key: "prompt wait time", kind: "seconds", a: timeA.wait, b: timeB.wait },
+    { key: "output time", kind: "seconds", a: timeA.output, b: timeB.output },
+    { key: "tool time", kind: "seconds", a: toolSeconds(callsA), b: toolSeconds(callsB) },
     { key: "cost", kind: "cost", a: a.totalCost, b: b.totalCost },
     {
       key: "cached prefix",
@@ -86,8 +115,7 @@ function compareMetrics(a: NormalizedTrace, b: NormalizedTrace): ComparedMetric[
       b: ib.promptWaitShare,
     });
   }
-  // traces without price data report 0; a delta of nothing is noise
-  return metrics.filter((m) => m.key !== "cost" || m.a > 0 || m.b > 0);
+  return metrics.filter((m) => !OPTIONAL_METRICS.has(m.key) || m.a > 0 || m.b > 0);
 }
 
 /** The run's system prompt: system messages of the first generation. */
