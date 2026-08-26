@@ -57,6 +57,18 @@ describe("api routes", () => {
     expect(((await res.json()) as { value: string }).value).toBe("test-model");
   });
 
+  it("serves the addressed trace's tool definitions", async () => {
+    const tooled: RawTrace = {
+      ...raw,
+      events: [{ ...raw.events[0]!, available_tools: [{ type: "function", name: "search" }] }],
+    };
+    const { base } = await serve(staticSource([{ raw: tooled, trace: normalizeTrace(tooled) }]));
+    expect(await (await fetch(`${base}/api/tools`)).json()).toEqual({
+      tools: [{ type: "function", name: "search" }],
+    });
+    expect((await fetch(`${base}/api/tools?id=nope`)).status).toBe(404);
+  });
+
   it("serves the agent command, quoted and run-scoped as needed", async () => {
     const plain = await serve(
       staticSource([{ raw, trace: normalizeTrace(raw), sourcePath: "/tmp/trace.json" }]),

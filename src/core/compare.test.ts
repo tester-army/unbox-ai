@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareTraces, pairTrajectory } from "./compare";
+import { collectToolDefs, compareTraces, pairTrajectory } from "./compare";
 import { diffLines } from "./diff";
 import { normalizeTrace } from "./normalize";
 import type { RawToolDef, RawTrace } from "./types";
@@ -39,7 +39,7 @@ function rawTrace(options: {
 }
 
 function side(raw: RawTrace) {
-  return { raw, trace: normalizeTrace(raw) };
+  return { trace: normalizeTrace(raw), tools: collectToolDefs(raw) };
 }
 
 describe("compareTraces", () => {
@@ -94,10 +94,11 @@ describe("compareTraces", () => {
       side(rawTrace({ id: "a", system: "you are helpful\nbe brief" })),
       side(rawTrace({ id: "b", system: "you are helpful\nbe thorough\nbe brief" })),
     );
-    expect(comparison.systemPrompt.same).toBe(false);
-    expect(comparison.systemPrompt.addedLines).toBe(1);
-    expect(comparison.systemPrompt.removedLines).toBe(0);
-    expect(comparison.systemPrompt.lines).toEqual([
+    const prompt = comparison.systemPrompt;
+    if (prompt.kind !== "differs") throw new Error(`expected a line diff, got ${prompt.kind}`);
+    expect(prompt.addedLines).toBe(1);
+    expect(prompt.removedLines).toBe(0);
+    expect(prompt.lines).toEqual([
       { kind: "same", text: "you are helpful" },
       { kind: "added", text: "be thorough" },
       { kind: "same", text: "be brief" },
@@ -109,8 +110,7 @@ describe("compareTraces", () => {
       side(rawTrace({ id: "a", system: "same" })),
       side(rawTrace({ id: "b", system: "same" })),
     );
-    expect(comparison.systemPrompt).toMatchObject({ same: true, addedLines: 0 });
-    expect(comparison.systemPrompt.lines).toBeUndefined();
+    expect(comparison.systemPrompt).toEqual({ kind: "identical", chars: 4 });
   });
 
   it("classifies tool definitions as added, removed, changed, unchanged", () => {
@@ -133,6 +133,15 @@ describe("compareTraces", () => {
       changed: ["edit"],
       unchanged: 1,
     });
+  });
+});
+
+describe("collectToolDefs", () => {
+  it("dedupes by name, a redefinition keeping the last one", () => {
+    const raw = rawTrace({ id: "a", events: 2 });
+    raw.events[0]!.available_tools = [{ type: "function", name: "search", description: "v1" }];
+    raw.events[1]!.available_tools = [{ type: "function", name: "search", description: "v2" }];
+    expect(collectToolDefs(raw)).toEqual([{ type: "function", name: "search", description: "v2" }]);
   });
 });
 

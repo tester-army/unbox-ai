@@ -49,11 +49,7 @@ export function Header({ trace, agentCommand, onCompare, comparing, onClear }: H
         {agentCommand ? (
           <CopyButton label="copy for agent" text={agentCommand} title={agentCommand} />
         ) : (
-          <Button
-            disabled
-            className="cursor-default opacity-40 hover:border-ta-grey-400 hover:text-ta-grey-100"
-            title="opened in this browser - agents need a file on disk"
-          >
+          <Button disabled title="opened in this browser - agents need a file on disk">
             copy for agent
           </Button>
         )}

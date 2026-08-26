@@ -1,13 +1,13 @@
 import { type DiffLine, diffLines } from "./diff";
-import { formatCost, formatSeconds, formatTokens } from "./format";
+import { formatCallNames, formatCost, formatSeconds, formatTokens } from "./format";
 import { computeInsights, type Insights } from "./insights";
 import { allToolCalls, toolCallNames } from "./normalize";
 import type { Generation, NormalizedTrace, RawToolDef, RawTrace } from "./types";
 
-/** One side of a comparison: the normalized trace plus its raw form. */
+/** One side of a comparison: the normalized trace plus its tool definitions. */
 export interface ComparableTrace {
   trace: NormalizedTrace;
-  raw: RawTrace;
+  tools: RawToolDef[];
 }
 
 export type MetricKind = "count" | "tokens" | "seconds" | "cost" | "share";
@@ -19,15 +19,18 @@ export interface ComparedMetric {
   b: number;
 }
 
-export interface PromptDiff {
-  same: boolean;
-  aChars: number;
-  bChars: number;
-  addedLines: number;
-  removedLines: number;
-  /** Absent when identical, or when the prompts are too large to diff. */
-  lines?: DiffLine[];
-}
+export type PromptDiff =
+  | { kind: "identical"; chars: number }
+  /** The prompts differ but are too large to line-diff. */
+  | { kind: "too-large"; aChars: number; bChars: number }
+  | {
+      kind: "differs";
+      aChars: number;
+      bChars: number;
+      addedLines: number;
+      removedLines: number;
+      lines: DiffLine[];
+    };
 
 export interface ToolsDiff {
   added: string[];
@@ -50,82 +53,91 @@ export function compareTraces(a: ComparableTrace, b: ComparableTrace): TraceComp
     models: { a: a.trace.models, b: b.trace.models },
     metrics: compareMetrics(a.trace, b.trace),
     systemPrompt: comparePrompts(systemPrompt(a.trace), systemPrompt(b.trace)),
-    tools: compareTools(toolDefs(a.raw), toolDefs(b.raw)),
+    tools: compareTools(a.tools, b.tools),
   };
 }
 
-/** Rows that only exist when the traces report the data; hidden when both sides are 0. */
-const OPTIONAL_METRICS = new Set([
-  "cost",
-  "prompt wait time",
-  "output time",
-  "unattributed time",
-  "tool time",
-  "reasoning tokens",
-]);
+/** Everything the metric rows read, derived once per side. */
+interface SideStats {
+  trace: NormalizedTrace;
+  insights: Insights;
+  calls: ReturnType<typeof allToolCalls>;
+  /** ttft-attributed split of model time, summed across segments. */
+  time: { wait: number; output: number; unattributed: number };
+}
+
+function sideStats(trace: NormalizedTrace): SideStats {
+  const insights = computeInsights(trace);
+  const time = insights.perSegment.reduce(
+    (acc, segment) => ({
+      wait: acc.wait + segment.promptWait,
+      output: acc.output + segment.generation,
+      unattributed: acc.unattributed + segment.unattributed,
+    }),
+    { wait: 0, output: 0, unattributed: 0 },
+  );
+  return { trace, insights, calls: allToolCalls(trace), time };
+}
+
+/**
+ * The metrics table, one row per entry, both sides read through `of`.
+ * `optional` rows hide when neither trace reports the data (both 0);
+ * an `of` returning null (unreported) drops the row entirely.
+ */
+const METRIC_ROWS: {
+  key: string;
+  kind: MetricKind;
+  optional?: true;
+  of: (side: SideStats) => number | null;
+}[] = [
+  { key: "generations", kind: "count", of: (s) => s.trace.generations.length },
+  { key: "segments", kind: "count", of: (s) => s.trace.segmentCount },
+  { key: "input tokens", kind: "tokens", of: (s) => s.trace.totalTokens.input },
+  { key: "output tokens", kind: "tokens", of: (s) => s.trace.totalTokens.output },
+  {
+    key: "reasoning tokens",
+    kind: "tokens",
+    optional: true,
+    of: (s) =>
+      s.trace.generations.reduce((sum, gen) => sum + (gen.metrics.reasoningTokens ?? 0), 0),
+  },
+  { key: "model time", kind: "seconds", of: (s) => s.trace.totalLatency },
+  // ttft-attributed split of model time: waiting for the first token vs
+  // producing tokens (thinking included - traces carry no finer split)
+  { key: "prompt wait time", kind: "seconds", optional: true, of: (s) => s.time.wait },
+  { key: "output time", kind: "seconds", optional: true, of: (s) => s.time.output },
+  // generations that report no ttft (reasoning models often don't) land
+  // here - this is where hidden thinking time shows up
+  { key: "unattributed time", kind: "seconds", optional: true, of: (s) => s.time.unattributed },
+  {
+    key: "tool time",
+    kind: "seconds",
+    optional: true,
+    of: (s) => s.calls.reduce((ms, call) => ms + (call.durationMs ?? 0), 0) / 1000,
+  },
+  { key: "cost", kind: "cost", optional: true, of: (s) => s.trace.totalCost },
+  {
+    key: "cached prefix",
+    kind: "share",
+    of: (s) => (s.insights.inputTokens > 0 ? s.insights.cachedTokens / s.insights.inputTokens : 0),
+  },
+  { key: "tool calls", kind: "count", of: (s) => s.calls.length },
+  {
+    key: "tool failures",
+    kind: "count",
+    of: (s) => s.calls.filter((call) => call.success === false).length,
+  },
+  { key: "prompt wait", kind: "share", of: (s) => s.insights.promptWaitShare },
+];
 
 function compareMetrics(a: NormalizedTrace, b: NormalizedTrace): ComparedMetric[] {
-  const ia = computeInsights(a);
-  const ib = computeInsights(b);
-  const callsA = allToolCalls(a);
-  const callsB = allToolCalls(b);
-  const failures = (calls: { success?: boolean }[]) =>
-    calls.filter((call) => call.success === false).length;
-  const toolSeconds = (calls: { durationMs?: number }[]) =>
-    calls.reduce((ms, call) => ms + (call.durationMs ?? 0), 0) / 1000;
-  const reasoning = (trace: NormalizedTrace) =>
-    trace.generations.reduce((sum, gen) => sum + (gen.metrics.reasoningTokens ?? 0), 0);
-  const modelTime = (insights: Insights) =>
-    insights.perSegment.reduce(
-      (acc, segment) => ({
-        wait: acc.wait + segment.promptWait,
-        output: acc.output + segment.generation,
-        unattributed: acc.unattributed + segment.unattributed,
-      }),
-      { wait: 0, output: 0, unattributed: 0 },
-    );
-  const share = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
-  const timeA = modelTime(ia);
-  const timeB = modelTime(ib);
-  const metrics: ComparedMetric[] = [
-    { key: "generations", kind: "count", a: a.generations.length, b: b.generations.length },
-    { key: "segments", kind: "count", a: a.segmentCount, b: b.segmentCount },
-    { key: "input tokens", kind: "tokens", a: a.totalTokens.input, b: b.totalTokens.input },
-    { key: "output tokens", kind: "tokens", a: a.totalTokens.output, b: b.totalTokens.output },
-    { key: "reasoning tokens", kind: "tokens", a: reasoning(a), b: reasoning(b) },
-    { key: "model time", kind: "seconds", a: a.totalLatency, b: b.totalLatency },
-    // ttft-attributed split of model time: waiting for the first token vs
-    // producing tokens (thinking included - traces carry no finer split)
-    { key: "prompt wait time", kind: "seconds", a: timeA.wait, b: timeB.wait },
-    { key: "output time", kind: "seconds", a: timeA.output, b: timeB.output },
-    // generations that report no ttft (reasoning models often don't) land
-    // here - this is where hidden thinking time shows up
-    {
-      key: "unattributed time",
-      kind: "seconds",
-      a: timeA.unattributed,
-      b: timeB.unattributed,
-    },
-    { key: "tool time", kind: "seconds", a: toolSeconds(callsA), b: toolSeconds(callsB) },
-    { key: "cost", kind: "cost", a: a.totalCost, b: b.totalCost },
-    {
-      key: "cached prefix",
-      kind: "share",
-      a: share(ia.cachedTokens, ia.inputTokens),
-      b: share(ib.cachedTokens, ib.inputTokens),
-    },
-    { key: "tool calls", kind: "count", a: callsA.length, b: callsB.length },
-    { key: "tool failures", kind: "count", a: failures(callsA), b: failures(callsB) },
-  ];
-  if (ia.promptWaitShare !== null && ib.promptWaitShare !== null) {
-    metrics.push({
-      key: "prompt wait",
-      kind: "share",
-      a: ia.promptWaitShare,
-      b: ib.promptWaitShare,
-    });
-  }
-  return metrics.filter((m) => !OPTIONAL_METRICS.has(m.key) || m.a > 0 || m.b > 0);
+  const [sa, sb] = [sideStats(a), sideStats(b)];
+  return METRIC_ROWS.flatMap((row) => {
+    const [va, vb] = [row.of(sa), row.of(sb)];
+    if (va === null || vb === null) return [];
+    if (row.optional && va <= 0 && vb <= 0) return [];
+    return [{ key: row.key, kind: row.kind, a: va, b: vb }];
+  });
 }
 
 /** The run's system prompt: system messages of the first generation. */
@@ -137,30 +149,32 @@ function systemPrompt(trace: NormalizedTrace): string {
 }
 
 function comparePrompts(a: string, b: string): PromptDiff {
-  if (a === b) {
-    return { same: true, aChars: a.length, bChars: b.length, addedLines: 0, removedLines: 0 };
-  }
+  if (a === b) return { kind: "identical", chars: a.length };
   const lines = diffLines(a.split("\n"), b.split("\n"));
+  if (lines === undefined) return { kind: "too-large", aChars: a.length, bChars: b.length };
   return {
-    same: false,
+    kind: "differs",
     aChars: a.length,
     bChars: b.length,
-    addedLines: lines?.filter((line) => line.kind === "added").length ?? 0,
-    removedLines: lines?.filter((line) => line.kind === "removed").length ?? 0,
-    ...(lines !== undefined ? { lines } : {}),
+    addedLines: lines.filter((line) => line.kind === "added").length,
+    removedLines: lines.filter((line) => line.kind === "removed").length,
+    lines,
   };
 }
 
-/** Tool definitions by name across all events; a redefinition keeps the last one. */
-function toolDefs(raw: RawTrace): Map<string, RawToolDef> {
+/** Tool definitions across all events, deduped by name; a redefinition keeps the last one. */
+export function collectToolDefs(raw: RawTrace): RawToolDef[] {
   const defs = new Map<string, RawToolDef>();
   for (const event of raw.events) {
     for (const def of event.available_tools ?? []) defs.set(def.name, def);
   }
-  return defs;
+  return [...defs.values()];
 }
 
-function compareTools(a: Map<string, RawToolDef>, b: Map<string, RawToolDef>): ToolsDiff {
+function compareTools(defsA: RawToolDef[], defsB: RawToolDef[]): ToolsDiff {
+  const byName = (defs: RawToolDef[]) => new Map(defs.map((def) => [def.name, def]));
+  const a = byName(defsA);
+  const b = byName(defsB);
   const added: string[] = [];
   const removed: string[] = [];
   const changed: string[] = [];
@@ -239,6 +253,27 @@ function pairByIndex(a: NormalizedTrace, b: NormalizedTrace): TrajectoryStep[] {
 export function actionKey(gen: Generation): string {
   const tools = toolCallNames(gen);
   return tools.length > 0 ? tools.join(",") : "text";
+}
+
+/** True when the runs differ at this step: a diverged pair or a one-sided row. */
+export function stepDiffers(step: TrajectoryStep): boolean {
+  return step.diverged || step.a === undefined || step.b === undefined;
+}
+
+/** "12" when both sides sit at the same generation, else "a12/b13" style. */
+export function stepIndexLabel(step: TrajectoryStep): string {
+  if (step.a !== undefined && step.b !== undefined) {
+    return step.a.index === step.b.index
+      ? String(step.a.index)
+      : `a${step.a.index}/b${step.b.index}`;
+  }
+  return step.a !== undefined ? `a${step.a.index}` : `b${step.b!.index}`;
+}
+
+/** One line of what a generation did: its tool calls, or the reply clipped to maxChars. */
+export function stepAction(gen: Generation, maxChars: number): string {
+  const calls = formatCallNames(toolCallNames(gen));
+  return calls !== "" ? calls : `-> ${(gen.newMessages.at(-1)?.text ?? "").slice(0, maxChars)}`;
 }
 
 /** One metric value rendered for its kind, shared by the CLI table and the viewer. */

@@ -164,21 +164,15 @@ function compareCommand(
 ): void {
   if (runSelectors.length > 2) fail("--run can be given at most twice for compare");
   const [pathA, pathB] = paths;
+  if (pathB === undefined && runSelectors.length !== 2) {
+    fail("compare needs two files, or one file with --run <x> --run <y> (see: runs)");
+  }
   const load = (path: string, selector: string | undefined) => ({
     loaded: selector !== undefined ? loadRun(path, selector) : loadTrace(path),
     label: selector !== undefined ? `${path} --run ${selector}` : path,
   });
-  if (pathB === undefined) {
-    if (runSelectors.length !== 2) {
-      fail("compare needs two files, or one file with --run <x> --run <y> (see: runs)");
-    }
-    const a = load(pathA!, runSelectors[0]);
-    const b = load(pathA!, runSelectors[1]);
-    compare(a.loaded, b.loaded, { a: a.label, b: b.label }, options);
-    return;
-  }
   const a = load(pathA!, runSelectors[0]);
-  const b = load(pathB, runSelectors[1]);
+  const b = load(pathB ?? pathA!, runSelectors[1]);
   compare(a.loaded, b.loaded, { a: a.label, b: b.label }, options);
 }
 

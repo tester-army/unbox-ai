@@ -4,8 +4,17 @@ import {
   runSummaries,
   type TraceCollectionItem,
 } from "@core/collection";
-import type { NormalizedTrace, RawTrace } from "@core/types";
+import type { NormalizedTrace } from "@core/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fetchJson } from "@/lib/api";
+import {
+  addLocalItems,
+  adoptItems,
+  localItems,
+  localTraceItem,
+  removeLocalSource,
+  uniqueSource,
+} from "@/lib/local-traces";
 
 interface TraceState {
   /** One entry per independent run, chronological; absent until loaded. */
@@ -19,19 +28,6 @@ interface TraceState {
   openError?: string;
   /** True when the server pushes updates (unbox-ai devtools mode). */
   live: boolean;
-}
-
-/** Browser-opened runs by trace id; parsed locally, never known to the server. */
-const localItems = new Map<string, TraceCollectionItem>();
-
-/** The raw trace behind a browser-opened run, or undefined for server runs. */
-export function localRawTrace(traceId: string): RawTrace | undefined {
-  return localItems.get(traceId)?.raw;
-}
-
-/** A browser-opened run with its raw form, or undefined for server runs. */
-export function localTraceItem(traceId: string): TraceCollectionItem | undefined {
-  return localItems.get(traceId);
 }
 
 /**
@@ -61,7 +57,7 @@ export function useTrace(): TraceState & {
     const seq = ++seqRef.current;
     try {
       const serverRuns = (await fetchJson("/api/traces")) as RunSummary[];
-      const runs = [...serverRuns, ...runSummaries([...localItems.values()])].filter(
+      const runs = [...serverRuns, ...runSummaries(localItems())].filter(
         (run) => run.source === undefined || !closedRef.current.has(run.source),
       );
       const latest = defaultRun(runs);
@@ -75,7 +71,7 @@ export function useTrace(): TraceState & {
         pinnedRef.current = false;
       }
       selectedRef.current = selected;
-      const local = selected !== undefined ? localItems.get(selected) : undefined;
+      const local = selected !== undefined ? localTraceItem(selected) : undefined;
       const [trace, command] =
         selected === undefined
           ? [undefined, undefined]
@@ -140,7 +136,7 @@ export function useTrace(): TraceState & {
           const items = parseCollection(JSON.parse(await file.text())).items;
           if (items.length === 0) throw new Error("no runs");
           const adopted = adoptItems(items, uniqueSource(file.name, takenSources()), takenIds());
-          for (const item of adopted) localItems.set(item.trace.traceId, item);
+          addLocalItems(adopted);
           lastOpened = adopted.at(-1);
         } catch {
           failure = `${file.name}: not a readable trace`;
@@ -157,12 +153,12 @@ export function useTrace(): TraceState & {
     function takenSources(): Set<string> {
       const taken = new Set(closedRef.current);
       for (const run of runsRef.current) if (run.source !== undefined) taken.add(run.source);
-      for (const item of localItems.values()) taken.add(item.sourcePath!);
+      for (const item of localItems()) taken.add(item.sourcePath!);
       return taken;
     }
     function takenIds(): Set<string> {
       const taken = new Set(runsRef.current.map((run) => run.id));
-      for (const id of localItems.keys()) taken.add(id);
+      for (const item of localItems()) taken.add(item.trace.traceId);
       return taken;
     }
   }, []);
@@ -173,9 +169,7 @@ export function useTrace(): TraceState & {
       (s): s is string => s !== undefined,
     );
     closedRef.current.add(source);
-    for (const [id, item] of localItems) {
-      if (item.sourcePath === source) localItems.delete(id);
-    }
+    removeLocalSource(source);
     // closing the active tab activates its right neighbor, else the left one
     if (runs.find((run) => run.id === selectedRef.current)?.source === source) {
       const index = order.indexOf(source);
@@ -202,45 +196,6 @@ function defaultRun(runs: RunSummary[]): string | undefined {
   return sameSource.length === runs.length ? runs.at(-1)?.id : sameSource.at(-1)?.id;
 }
 
-/** The dropped file's name, counted up when a tab by that name already exists. */
-function uniqueSource(name: string, taken: Set<string>): string {
-  if (!taken.has(name)) return name;
-  for (let n = 2; ; n++) if (!taken.has(`${name} (${n})`)) return `${name} (${n})`;
-}
-
-/**
- * Tags parsed runs with their tab source and de-collides run ids against
- * already-listed ones (reopening a served file), keeping parent links whole.
- */
-function adoptItems(
-  items: TraceCollectionItem[],
-  source: string,
-  takenIds: Set<string>,
-): TraceCollectionItem[] {
-  const rename = new Map<string, string>();
-  for (const { trace } of items) {
-    let id = trace.traceId;
-    if (takenIds.has(id)) {
-      let n = 2;
-      while (takenIds.has(`${id} (${n})`)) n++;
-      id = `${id} (${n})`;
-      rename.set(trace.traceId, id);
-    }
-    takenIds.add(id);
-  }
-  return items.map((item) => {
-    const trace = {
-      ...item.trace,
-      traceId: rename.get(item.trace.traceId) ?? item.trace.traceId,
-      parentTraceId:
-        item.trace.parentTraceId !== undefined
-          ? (rename.get(item.trace.parentTraceId) ?? item.trace.parentTraceId)
-          : undefined,
-    };
-    return { raw: item.raw, trace, sourcePath: source };
-  });
-}
-
 /** Sources without a file path (or older servers) have no command; not an error. */
 async function fetchCommand(id: string): Promise<string | undefined> {
   try {
@@ -250,10 +205,4 @@ async function fetchCommand(id: string): Promise<string | undefined> {
   } catch {
     return undefined;
   }
-}
-
-async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error((await res.json())?.error ?? `HTTP ${res.status}`);
-  return res.json();
 }

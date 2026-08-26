@@ -1,14 +1,18 @@
 import {
+  collectToolDefs,
   compareTraces,
   metricDelta,
   metricValue,
   type PromptDiff,
   pairTrajectory,
+  stepAction,
+  stepDiffers,
+  stepIndexLabel,
   type ToolsDiff,
   type TrajectoryStep,
 } from "../../core/compare";
 import type { DiffLine } from "../../core/diff";
-import { formatCallNames, formatSeconds, formatTokens } from "../../core/format";
+import { formatSeconds, formatTokens } from "../../core/format";
 import { toolCallNames } from "../../core/normalize";
 import type { Generation } from "../../core/types";
 import type { LoadedTrace } from "../load";
@@ -26,7 +30,11 @@ export function compare(
   labels: { a: string; b: string },
   options: { json: boolean; trajectory: boolean },
 ): void {
-  const comparison = compareTraces(a, b);
+  const comparable = (loaded: LoadedTrace) => ({
+    trace: loaded.trace,
+    tools: collectToolDefs(loaded.raw),
+  });
+  const comparison = compareTraces(comparable(a), comparable(b));
   const steps = pairTrajectory(a.trace, b.trace);
   if (options.json) {
     printJson({
@@ -68,9 +76,7 @@ export function compare(
     console.log("");
     printTrajectory(steps);
   } else {
-    const different = steps.filter(
-      (step) => step.diverged || step.a === undefined || step.b === undefined,
-    );
+    const different = steps.filter(stepDiffers);
     if (different.length > 0) {
       const at = different[0]!;
       console.log(
@@ -99,8 +105,8 @@ function printTrajectory(steps: TrajectoryStep[]): void {
     table(
       ["gen", "", "A", "B"],
       steps.map((step) => [
-        indexCell(step),
-        step.diverged || step.a === undefined || step.b === undefined ? "*" : "",
+        stepIndexLabel(step),
+        stepDiffers(step) ? "*" : "",
         actionCell(step.a),
         actionCell(step.b),
       ]),
@@ -108,21 +114,9 @@ function printTrajectory(steps: TrajectoryStep[]): void {
   );
 }
 
-/** "12" when both sides sit at the same generation, else "a12/b13" style. */
-function indexCell(step: TrajectoryStep): string {
-  if (step.a !== undefined && step.b !== undefined) {
-    return step.a.index === step.b.index
-      ? String(step.a.index)
-      : `a${step.a.index}/b${step.b.index}`;
-  }
-  return step.a !== undefined ? `a${step.a.index}` : `b${step.b!.index}`;
-}
-
 function actionCell(gen: Generation | undefined): string {
   if (gen === undefined) return "-";
-  const calls = formatCallNames(toolCallNames(gen));
-  const doing = calls !== "" ? calls : `-> ${(gen.newMessages.at(-1)?.text ?? "").slice(0, 32)}`;
-  return `${doing}  ${formatTokens(gen.metrics.inputTokens)} in ${formatSeconds(gen.metrics.latency)}`;
+  return `${stepAction(gen, 32)}  ${formatTokens(gen.metrics.inputTokens)} in ${formatSeconds(gen.metrics.latency)}`;
 }
 
 function side(loaded: LoadedTrace, label: string) {
@@ -135,15 +129,15 @@ function side(loaded: LoadedTrace, label: string) {
 }
 
 function printPromptDiff(diff: PromptDiff): void {
-  if (diff.same) {
+  if (diff.kind === "identical") {
     console.log(
-      diff.aChars === 0
+      diff.chars === 0
         ? "system prompt  none in either trace"
-        : `system prompt  identical (${diff.aChars} chars)`,
+        : `system prompt  identical (${diff.chars} chars)`,
     );
     return;
   }
-  if (diff.lines === undefined) {
+  if (diff.kind === "too-large") {
     console.log(
       `system prompt  differs (A ${diff.aChars} chars, B ${diff.bChars} chars - too large to line-diff, see --json)`,
     );

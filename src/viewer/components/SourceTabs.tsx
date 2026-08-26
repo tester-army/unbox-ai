@@ -1,7 +1,7 @@
 import type { RunSummary } from "@core/collection";
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { basename, cn, pathSegments } from "@/lib/utils";
 
 export interface SourceTab {
   /** Absolute path (server files) or file name (browser-opened); the grouping key. */
@@ -33,14 +33,16 @@ export function sourceTabs(runs: RunSummary[]): SourceTab[] {
 
 /** Basenames, widened to parent/basename when two files share a name. */
 function disambiguate(sources: string[]): Map<string, string> {
-  const segments = (path: string) => path.split(/[\\/]/).filter(Boolean);
-  const base = (path: string) => segments(path).at(-1) ?? path;
   const counts = new Map<string, number>();
-  for (const source of sources) counts.set(base(source), (counts.get(base(source)) ?? 0) + 1);
+  for (const source of sources) {
+    counts.set(basename(source), (counts.get(basename(source)) ?? 0) + 1);
+  }
   return new Map(
     sources.map((source) => [
       source,
-      counts.get(base(source))! > 1 ? segments(source).slice(-2).join("/") : base(source),
+      counts.get(basename(source))! > 1
+        ? pathSegments(source).slice(-2).join("/")
+        : basename(source),
     ]),
   );
 }

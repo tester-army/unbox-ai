@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Markdown } from "@/components/ui/markdown";
+import { localRawTrace } from "@/lib/local-traces";
 import type { TreemapLeaf } from "@/lib/treemap-data";
-import { localRawTrace } from "@/lib/use-trace";
 
 /** Full definition of a clicked treemap block: pretty-rendered, raw JSON a toggle away. */
 export function DefinitionDialog({

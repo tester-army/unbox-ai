@@ -2,21 +2,26 @@ import type { RunSummary } from "@core/collection";
 import {
   type ComparableTrace,
   type ComparedMetric,
+  collectToolDefs,
   compareTraces,
   metricDelta,
   metricValue,
+  type PromptDiff,
   pairTrajectory,
+  stepAction,
+  stepDiffers,
+  stepIndexLabel,
   type TraceComparison,
   type TrajectoryStep,
 } from "@core/compare";
-import { formatCallNames, formatSeconds, formatTokens } from "@core/format";
-import { toolCallNames } from "@core/normalize";
-import type { Generation, NormalizedTrace, RawTrace } from "@core/types";
+import { formatSeconds, formatTokens } from "@core/format";
+import type { Generation, NormalizedTrace, RawToolDef } from "@core/types";
 import { useEffect, useMemo, useState } from "react";
 import { MessageCard } from "@/components/MessageCard";
 import { Button } from "@/components/ui/button";
-import { localTraceItem } from "@/lib/use-trace";
-import { cn } from "@/lib/utils";
+import { fetchJson } from "@/lib/api";
+import { localTraceItem } from "@/lib/local-traces";
+import { basename, cn } from "@/lib/utils";
 
 interface CompareViewProps {
   runs: RunSummary[];
@@ -104,11 +109,10 @@ export function CompareView({ runs, initialA, onClose }: CompareViewProps) {
 /** A short, human name for a side: file basename without the trace suffix. */
 function shortLabel(runs: RunSummary[], id: string): string {
   const run = runs.find((r) => r.id === id);
-  const base = run?.source
-    ?.split(/[\\/]/)
-    .filter(Boolean)
-    .at(-1)
-    ?.replace(/\.trace\.json$|\.json$/, "");
+  const base =
+    run?.source !== undefined
+      ? basename(run.source).replace(/\.trace\.json$|\.json$/, "")
+      : undefined;
   const label = base ?? run?.name ?? id;
   return label.length > 16 ? `${label.slice(0, 15)}…` : label;
 }
@@ -144,8 +148,7 @@ function RunSelect({
 
 /** "file.json · run name" so cross-file picks stay legible. */
 function runLabel(run: RunSummary): string {
-  const base = run.source?.split(/[\\/]/).filter(Boolean).at(-1);
-  return base !== undefined ? `${base} · ${run.name}` : run.name;
+  return run.source !== undefined ? `${basename(run.source)} · ${run.name}` : run.name;
 }
 
 interface SideLabels {
@@ -255,9 +258,7 @@ const ROW_GRID = "grid grid-cols-[4.5rem_1fr_1fr] gap-x-4";
 
 function Trajectory({ steps, labels }: { steps: TrajectoryStep[]; labels: SideLabels }) {
   const [expanded, setExpanded] = useState<number>();
-  const different = steps.filter(
-    (step) => step.diverged || step.a === undefined || step.b === undefined,
-  );
+  const different = steps.filter(stepDiffers);
   return (
     <Section
       label={
@@ -278,7 +279,7 @@ function Trajectory({ steps, labels }: { steps: TrajectoryStep[]; labels: SideLa
           <span className="truncate">B · {labels.b}</span>
         </div>
         {steps.map((step, row) => {
-          const differs = step.diverged || step.a === undefined || step.b === undefined;
+          const differs = stepDiffers(step);
           return (
             <div
               key={`${step.a?.index ?? "-"}:${step.b?.index ?? "-"}`}
@@ -321,20 +322,9 @@ function Trajectory({ steps, labels }: { steps: TrajectoryStep[]; labels: SideLa
   );
 }
 
-/** "12" when both sides sit at the same generation, else "a12/b13" style. */
-function stepIndexLabel(step: TrajectoryStep): string {
-  if (step.a !== undefined && step.b !== undefined) {
-    return step.a.index === step.b.index
-      ? String(step.a.index)
-      : `a${step.a.index}/b${step.b.index}`;
-  }
-  return step.a !== undefined ? `a${step.a.index}` : `b${step.b!.index}`;
-}
-
 function GenCell({ gen, diverged }: { gen?: Generation; diverged: boolean }) {
   if (gen === undefined) return <span className="text-ta-grey-300">-</span>;
-  const calls = formatCallNames(toolCallNames(gen));
-  const doing = calls !== "" ? calls : `-> ${(gen.newMessages.at(-1)?.text ?? "").slice(0, 80)}`;
+  const doing = stepAction(gen, 80);
   return (
     <span className="flex min-w-0 items-baseline gap-3">
       <span className={cn("min-w-0 truncate", diverged ? "text-ta-orange-75" : "text-ta-grey-100")}>
@@ -367,17 +357,17 @@ function GenDetail({ gen }: { gen?: Generation }) {
 /** Full diff is rendered; the pane scrolls. */
 const MAX_RENDERED_DIFF_LINES = 600;
 
-function PromptSection({ prompt }: { prompt: TraceComparison["systemPrompt"] }) {
-  if (prompt.same) {
+function PromptSection({ prompt }: { prompt: PromptDiff }) {
+  if (prompt.kind === "identical") {
     return (
       <Section label="system prompt">
         <p className="type-body-s text-ta-grey-200">
-          {prompt.aChars === 0 ? "none in either run" : `identical (${prompt.aChars} chars)`}
+          {prompt.chars === 0 ? "none in either run" : `identical (${prompt.chars} chars)`}
         </p>
       </Section>
     );
   }
-  if (prompt.lines === undefined) {
+  if (prompt.kind === "too-large") {
     return (
       <Section label="system prompt">
         <p className="type-body-s text-ta-grey-200">
@@ -448,21 +438,15 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-/** A run's trace + raw, from local memory for browser-opened files, else the server. */
+/** A run's comparable form, from local memory for browser-opened files, else the server. */
 async function loadSide(id: string): Promise<ComparableTrace> {
   const local = localTraceItem(id);
-  if (local !== undefined) return local;
-  const [trace, raw] = await Promise.all([
+  if (local !== undefined) return { trace: local.trace, tools: collectToolDefs(local.raw) };
+  const [trace, tools] = await Promise.all([
     fetchJson(`/api/trace?id=${encodeURIComponent(id)}`) as Promise<NormalizedTrace>,
-    (fetchJson(`/api/raw?id=${encodeURIComponent(id)}&path=`) as Promise<{ value: RawTrace }>).then(
-      (body) => body.value,
+    (fetchJson(`/api/tools?id=${encodeURIComponent(id)}`) as Promise<{ tools: RawToolDef[] }>).then(
+      (body) => body.tools,
     ),
   ]);
-  return { trace, raw };
-}
-
-async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error((await res.json())?.error ?? `HTTP ${res.status}`);
-  return res.json();
+  return { trace, tools };
 }
