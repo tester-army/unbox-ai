@@ -37,9 +37,10 @@ unbox-ai compare <a> <b>        # A/B: metric deltas + system prompt / tool-set 
 - `--grep` accepts regex; invalid regex silently falls back to literal search.
 - `tools --all` lists every individual call with args.
 - `compare` answers "what changed between these two runs": token/cost/time
-  deltas, then a line diff of the system prompt and the tool-set changes -
-  added/removed names plus, per changed tool, what changed (description or
-  schema). Two runs of one file: `compare <trace> --run 0 --run 1` (first --run
+  deltas, a task diff (differing tasks make deltas misleading), per-tool
+  usage deltas, then a line diff of the system prompt and the tool-set
+  changes - added/removed names plus, per changed tool, what changed
+  (description or schema). Two runs of one file: `compare <trace> --run 0 --run 1` (first --run
   scopes A, second B). Diff output is bounded; `--json` has the full diff.
   `--trajectory` adds a content-aligned action table (* = differing step,
   - = no counterpart; alignment is LCS over tool sequences, so an extra step

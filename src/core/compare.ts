@@ -48,21 +48,87 @@ export interface ToolsDiff {
   unchanged: number;
 }
 
+/** One tool's call activity in both runs. */
+export interface ToolUsageDelta {
+  name: string;
+  a: ToolUsageSide;
+  b: ToolUsageSide;
+}
+
+export interface ToolUsageSide {
+  calls: number;
+  failures: number;
+  seconds: number;
+}
+
 export interface TraceComparison {
   models: { a: string[]; b: string[] };
   metrics: ComparedMetric[];
+  /** The runs' first user messages - differing tasks make deltas misleading. */
+  task: PromptDiff;
   systemPrompt: PromptDiff;
   tools: ToolsDiff;
+  /** Per-tool call activity, biggest call-count change first. */
+  toolUsage: ToolUsageDelta[];
 }
 
-/** Diffs two traces: headline metric deltas plus system prompt and tool-set changes. */
+/** Diffs two traces: headline metric deltas plus task, prompt, and tool changes. */
 export function compareTraces(a: ComparableTrace, b: ComparableTrace): TraceComparison {
   return {
     models: { a: a.trace.models, b: b.trace.models },
     metrics: compareMetrics(a.trace, b.trace),
+    task: comparePrompts(taskPrompt(a.trace), taskPrompt(b.trace)),
     systemPrompt: comparePrompts(systemPrompt(a.trace), systemPrompt(b.trace)),
     tools: compareTools(a.tools, b.tools),
+    toolUsage: compareToolUsage(a.trace, b.trace),
   };
+}
+
+/** The task given to the run: its first user message. */
+export function taskPrompt(trace: NormalizedTrace): string {
+  for (const gen of trace.generations) {
+    for (const message of gen.newMessages) {
+      if (message.role === "user") return message.text;
+    }
+  }
+  return "";
+}
+
+/** What the run concluded: its last assistant message that carries text. */
+export function finalText(trace: NormalizedTrace): string {
+  for (let i = trace.generations.length - 1; i >= 0; i--) {
+    const messages = trace.generations[i]!.newMessages;
+    for (let j = messages.length - 1; j >= 0; j--) {
+      const message = messages[j]!;
+      if (message.role === "assistant" && message.text.trim() !== "") return message.text;
+    }
+  }
+  return "";
+}
+
+function compareToolUsage(a: NormalizedTrace, b: NormalizedTrace): ToolUsageDelta[] {
+  const usage = (trace: NormalizedTrace) => {
+    const byName = new Map<string, ToolUsageSide>();
+    for (const call of allToolCalls(trace)) {
+      const entry = byName.get(call.name) ?? { calls: 0, failures: 0, seconds: 0 };
+      entry.calls++;
+      if (call.success === false) entry.failures++;
+      entry.seconds += (call.durationMs ?? 0) / 1000;
+      byName.set(call.name, entry);
+    }
+    return byName;
+  };
+  const [ua, ub] = [usage(a), usage(b)];
+  const none: ToolUsageSide = { calls: 0, failures: 0, seconds: 0 };
+  const names = [...new Set([...ua.keys(), ...ub.keys()])];
+  return names
+    .map((name) => ({ name, a: ua.get(name) ?? none, b: ub.get(name) ?? none }))
+    .sort(
+      (x, y) =>
+        Math.abs(y.b.calls - y.a.calls) - Math.abs(x.b.calls - x.a.calls) ||
+        y.a.calls + y.b.calls - (x.a.calls + x.b.calls) ||
+        x.name.localeCompare(y.name),
+    );
 }
 
 /** Everything the metric rows read, derived once per side. */

@@ -10,6 +10,7 @@ import {
   stepIndexLabel,
   type ToolChange,
   type ToolsDiff,
+  type ToolUsageDelta,
   type TrajectoryStep,
 } from "../../core/compare";
 import type { DiffLine } from "../../core/diff";
@@ -59,6 +60,7 @@ export function compare(
       ? `models  ${models.a.join(", ")}`
       : `models  A: ${models.a.join(", ")}  B: ${models.b.join(", ")}`,
   );
+  printPromptDiff("task", comparison.task);
   console.log("");
   console.log(
     table(
@@ -72,8 +74,9 @@ export function compare(
     ),
   );
   console.log("");
-  printPromptDiff(comparison.systemPrompt);
+  printPromptDiff("system prompt", comparison.systemPrompt);
   printToolsDiff(comparison.tools);
+  printToolUsage(comparison.toolUsage);
   if (options.trajectory) {
     console.log("");
     printTrajectory(steps);
@@ -130,22 +133,21 @@ function side(loaded: LoadedTrace, label: string) {
   };
 }
 
-function printPromptDiff(diff: PromptDiff): void {
+function printPromptDiff(label: string, diff: PromptDiff): void {
+  const tag = label.padEnd(15);
   if (diff.kind === "identical") {
     console.log(
-      diff.chars === 0
-        ? "system prompt  none in either trace"
-        : `system prompt  identical (${diff.chars} chars)`,
+      diff.chars === 0 ? `${tag}none in either trace` : `${tag}identical (${diff.chars} chars)`,
     );
     return;
   }
   if (diff.kind === "too-large") {
     console.log(
-      `system prompt  differs (A ${diff.aChars} chars, B ${diff.bChars} chars - too large to line-diff, see --json)`,
+      `${tag}differs (A ${diff.aChars} chars, B ${diff.bChars} chars - too large to line-diff, see --json)`,
     );
     return;
   }
-  console.log(`system prompt  differs: +${diff.addedLines} / -${diff.removedLines} lines`);
+  console.log(`${tag}differs: +${diff.addedLines} / -${diff.removedLines} lines`);
   const printable = hunks(diff.lines);
   for (const line of printable.slice(0, MAX_DIFF_LINES)) console.log(`  ${line}`);
   if (printable.length > MAX_DIFF_LINES) {
@@ -197,6 +199,34 @@ function printToolsDiff(tools: ToolsDiff): void {
   }
   if (tools.changed.length > MAX_CHANGED_TOOLS) {
     console.log(`  [... ${tools.changed.length - MAX_CHANGED_TOOLS} more]`);
+  }
+}
+
+/** Per-tool call activity where the runs differ; identical rows just count. */
+function printToolUsage(usage: ToolUsageDelta[]): void {
+  const changed = usage.filter((u) => u.a.calls !== u.b.calls || u.a.failures !== u.b.failures);
+  if (changed.length === 0) return;
+  const same = usage.length - changed.length;
+  console.log(`\ntool usage (biggest change first${same > 0 ? ` · ${same} tools unchanged` : ""})`);
+  const pair = (a: number, b: number, render: (v: number) => string) =>
+    a === 0 && b === 0 ? "" : `${render(a)} -> ${render(b)}`;
+  console.log(
+    table(
+      ["tool", "A", "B", "delta", "failures", "time"],
+      changed
+        .slice(0, MAX_CHANGED_TOOLS)
+        .map((u) => [
+          u.name,
+          String(u.a.calls),
+          String(u.b.calls),
+          metricDelta({ key: u.name, kind: "count", a: u.a.calls, b: u.b.calls }),
+          pair(u.a.failures, u.b.failures, String),
+          pair(u.a.seconds, u.b.seconds, formatSeconds),
+        ]),
+    ),
+  );
+  if (changed.length > MAX_CHANGED_TOOLS) {
+    console.log(`  [... ${changed.length - MAX_CHANGED_TOOLS} more - see --json]`);
   }
 }
 
