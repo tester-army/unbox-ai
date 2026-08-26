@@ -71,10 +71,20 @@ export default defineConfig({
   root: "src/viewer",
   plugins: [react(), tailwindcss(), devTraceApi()],
   resolve: {
-    alias: {
-      "@": resolve(import.meta.dirname, "src/viewer"),
-      "@core": resolve(import.meta.dirname, "src/core"),
-    },
+    alias: [
+      { find: "@core", replacement: resolve(import.meta.dirname, "src/core") },
+      { find: "@", replacement: resolve(import.meta.dirname, "src/viewer") },
+      // @pierre/diffs imports the full shiki bundle (every grammar as a
+      // chunk); the viewer only diffs markdown and json - see the shims
+      {
+        find: /^shiki$/,
+        replacement: resolve(import.meta.dirname, "src/viewer/lib/shiki-slim.ts"),
+      },
+      {
+        find: /^shiki\/wasm$/,
+        replacement: resolve(import.meta.dirname, "src/viewer/lib/shiki-wasm-stub.ts"),
+      },
+    ],
   },
   build: {
     outDir: resolve(import.meta.dirname, "dist/viewer"),

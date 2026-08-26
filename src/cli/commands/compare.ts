@@ -8,6 +8,7 @@ import {
   stepAction,
   stepDiffers,
   stepIndexLabel,
+  type ToolChange,
   type ToolsDiff,
   type TrajectoryStep,
 } from "../../core/compare";
@@ -22,6 +23,7 @@ import { printJson, table } from "../output";
 const MAX_DIFF_LINES = 40;
 const MAX_LINE_CHARS = 160;
 const MAX_NAMES = 8;
+const MAX_CHANGED_TOOLS = 20;
 
 /** Prints metric deltas and config differences between two loaded traces. */
 export function compare(
@@ -184,9 +186,24 @@ function printToolsDiff(tools: ToolsDiff): void {
   if (tools.removed.length > 0) {
     parts.push(`-${tools.removed.length} removed (${names(tools.removed)})`);
   }
-  if (tools.changed.length > 0) {
-    parts.push(`${tools.changed.length} changed (${names(tools.changed)})`);
-  }
+  if (tools.changed.length > 0) parts.push(`${tools.changed.length} changed`);
   parts.push(`${tools.unchanged} unchanged`);
   console.log(`tools          ${parts.join(" · ")}`);
+  if (tools.changed.length === 0) return;
+  console.log("changed tools (definition diffs: --json):");
+  const width = Math.max(...tools.changed.map((change) => change.name.length));
+  for (const change of tools.changed.slice(0, MAX_CHANGED_TOOLS)) {
+    console.log(`  ~ ${change.name.padEnd(width)}  ${changeSummary(change)}`);
+  }
+  if (tools.changed.length > MAX_CHANGED_TOOLS) {
+    console.log(`  [... ${tools.changed.length - MAX_CHANGED_TOOLS} more]`);
+  }
+}
+
+/** "description + schema · +3/-1 lines" style. */
+function changeSummary(change: ToolChange): string {
+  if (change.lines === undefined) return `${change.parts.join(" + ")} · too large to line-diff`;
+  const added = change.lines.filter((line) => line.kind === "added").length;
+  const removed = change.lines.filter((line) => line.kind === "removed").length;
+  return `${change.parts.join(" + ")} · +${added}/-${removed} lines`;
 }

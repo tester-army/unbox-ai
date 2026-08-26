@@ -11,11 +11,15 @@ import {
   stepAction,
   stepDiffers,
   stepIndexLabel,
+  systemPrompt,
+  type ToolChange,
   type TraceComparison,
   type TrajectoryStep,
+  toolDefParts,
 } from "@core/compare";
 import { formatSeconds, formatTokens } from "@core/format";
 import type { Generation, NormalizedTrace, RawToolDef } from "@core/types";
+import { MultiFileDiff } from "@pierre/diffs/react";
 import { useEffect, useMemo, useState } from "react";
 import { MessageCard } from "@/components/MessageCard";
 import { Button } from "@/components/ui/button";
@@ -30,6 +34,11 @@ interface CompareViewProps {
   onClose: () => void;
 }
 
+interface Sides {
+  a: ComparableTrace;
+  b: ComparableTrace;
+}
+
 /**
  * Full-pane A/B exploration: aligned per-generation trajectory with
  * expandable message detail, headline deltas, prompt and tool diffs.
@@ -39,7 +48,7 @@ export function CompareView({ runs, initialA, onClose }: CompareViewProps) {
   const [bId, setBId] = useState(
     () => (runs.find((run) => run.id !== initialA) ?? runs[0])?.id ?? initialA,
   );
-  const [sides, setSides] = useState<{ a: ComparableTrace; b: ComparableTrace }>();
+  const [sides, setSides] = useState<Sides>();
   const [error, setError] = useState<string>();
 
   useEffect(() => {
@@ -93,12 +102,16 @@ export function CompareView({ runs, initialA, onClose }: CompareViewProps) {
         {!error && comparison === undefined && (
           <p className="type-accent-s text-ta-grey-200">loading runs...</p>
         )}
-        {comparison && steps && (
+        {sides && comparison && steps && (
           <>
             <MetricsGrid comparison={comparison} labels={labels} />
             <Trajectory steps={steps} labels={labels} />
-            <PromptSection prompt={comparison.systemPrompt} />
-            <ToolsSection tools={comparison.tools} />
+            <PromptSection
+              prompt={comparison.systemPrompt}
+              a={systemPrompt(sides.a.trace)}
+              b={systemPrompt(sides.b.trace)}
+            />
+            <ToolsSection tools={comparison.tools} sides={sides} />
           </>
         )}
       </div>
@@ -354,10 +367,7 @@ function GenDetail({ gen }: { gen?: Generation }) {
   );
 }
 
-/** Full diff is rendered; the pane scrolls. */
-const MAX_RENDERED_DIFF_LINES = 600;
-
-function PromptSection({ prompt }: { prompt: PromptDiff }) {
+function PromptSection({ prompt, a, b }: { prompt: PromptDiff; a: string; b: string }) {
   if (prompt.kind === "identical") {
     return (
       <Section label="system prompt">
@@ -367,48 +377,49 @@ function PromptSection({ prompt }: { prompt: PromptDiff }) {
       </Section>
     );
   }
-  if (prompt.kind === "too-large") {
-    return (
-      <Section label="system prompt">
-        <p className="type-body-s text-ta-grey-200">
-          differs (A {prompt.aChars} chars, B {prompt.bChars} chars - too large to line-diff)
-        </p>
-      </Section>
-    );
-  }
-  const lines = prompt.lines.slice(0, MAX_RENDERED_DIFF_LINES);
+  const label =
+    prompt.kind === "differs"
+      ? `system prompt · +${prompt.addedLines} / -${prompt.removedLines} lines`
+      : `system prompt · differs (A ${prompt.aChars} chars, B ${prompt.bChars} chars)`;
   return (
-    <Section label={`system prompt · +${prompt.addedLines} / -${prompt.removedLines} lines`}>
-      <div className="type-body-s overflow-x-auto whitespace-pre border border-ta-grey-400 bg-ta-grey-450 px-3 py-2 font-(family-name:--font-dm-mono) leading-relaxed">
-        {lines.map((line, i) => (
-          <div
-            // diff lines have no identity beyond their position
-            // biome-ignore lint/suspicious/noArrayIndexKey: positional list
-            key={i}
-            className={cn(
-              line.kind === "added" && "bg-ta-orange-300/10 text-ta-orange-75",
-              line.kind === "removed" && "bg-ta-error/10 text-ta-error",
-              line.kind === "same" && "text-ta-grey-200",
-            )}
-          >
-            {line.kind === "added" ? "+ " : line.kind === "removed" ? "- " : "  "}
-            {line.text}
-          </div>
-        ))}
-        {prompt.lines.length > lines.length && (
-          <div className="text-ta-grey-300">
-            [... {prompt.lines.length - lines.length} more lines]
-          </div>
-        )}
-      </div>
+    <Section label={label}>
+      <TextDiff name="system-prompt.md" before={a} after={b} />
     </Section>
   );
 }
 
-function ToolsSection({ tools }: { tools: TraceComparison["tools"] }) {
-  const total = tools.unchanged + tools.changed.length + tools.added.length + tools.removed.length;
+/** Shared @pierre/diffs settings; unchanged stretches collapse behind expanders. */
+const DIFF_OPTIONS = {
+  theme: "pierre-dark",
+  themeType: "dark",
+  diffStyle: "split",
+  disableFileHeader: true,
+  overflow: "wrap",
+} as const;
+
+/** A split before/after diff of two texts; `name`'s extension picks the highlighting. */
+function TextDiff({ name, before, after }: { name: string; before: string; after: string }) {
+  const oldFile = useMemo(() => ({ name, contents: before }), [name, before]);
+  const newFile = useMemo(() => ({ name, contents: after }), [name, after]);
   return (
-    <Section label="tools">
+    <div className="overflow-hidden border border-ta-grey-400">
+      <MultiFileDiff oldFile={oldFile} newFile={newFile} options={DIFF_OPTIONS} />
+    </div>
+  );
+}
+
+function ToolsSection({ tools, sides }: { tools: TraceComparison["tools"]; sides: Sides }) {
+  const [expanded, setExpanded] = useState<string>();
+  const total = tools.unchanged + tools.changed.length + tools.added.length + tools.removed.length;
+  const defs = useMemo(
+    () => ({
+      a: new Map(sides.a.tools.map((def) => [def.name, def])),
+      b: new Map(sides.b.tools.map((def) => [def.name, def])),
+    }),
+    [sides],
+  );
+  return (
+    <Section label={`tools · ${tools.unchanged} unchanged`}>
       {total === 0 ? (
         <p className="type-body-s text-ta-grey-200">none in either run</p>
       ) : (
@@ -420,13 +431,67 @@ function ToolsSection({ tools }: { tools: TraceComparison["tools"] }) {
             <p className="text-ta-error">- removed: {tools.removed.join(", ")}</p>
           )}
           {tools.changed.length > 0 && (
-            <p className="text-ta-sand-50">changed: {tools.changed.join(", ")}</p>
+            <div className="mt-1 border border-ta-grey-400">
+              {tools.changed.map((change) => (
+                <div key={change.name} className="border-b border-ta-grey-400 last:border-b-0">
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(expanded === change.name ? undefined : change.name)}
+                    aria-expanded={expanded === change.name}
+                    className={cn(
+                      "flex w-full cursor-pointer items-baseline gap-3 px-4 py-2 text-left transition-colors hover:bg-ta-grey-450",
+                      expanded === change.name && "bg-ta-grey-450",
+                    )}
+                  >
+                    <span className="text-ta-sand-50">~ {change.name}</span>
+                    <span className="text-ta-grey-300">{changeSummary(change)}</span>
+                  </button>
+                  {expanded === change.name && (
+                    <ToolChangeDetail
+                      change={change}
+                      a={defs.a.get(change.name)!}
+                      b={defs.b.get(change.name)!}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
           )}
-          <p className="text-ta-grey-200">{tools.unchanged} unchanged</p>
         </div>
       )}
     </Section>
   );
+}
+
+/** The changed parts of one redefined tool, each as its own before/after diff. */
+function ToolChangeDetail({ change, a, b }: { change: ToolChange; a: RawToolDef; b: RawToolDef }) {
+  const [partsA, partsB] = [toolDefParts(a), toolDefParts(b)];
+  return (
+    <div className="flex flex-col gap-3 border-t border-ta-grey-400 px-4 py-3">
+      {change.parts.includes("description") && (
+        <TextDiff
+          name={`${change.name}.md`}
+          before={partsA.description}
+          after={partsB.description}
+        />
+      )}
+      {change.parts.includes("schema") && (
+        <TextDiff
+          name={`${change.name}.schema.json`}
+          before={partsA.schema}
+          after={partsB.schema}
+        />
+      )}
+    </div>
+  );
+}
+
+/** "description + schema · +3/-1 lines" style. */
+function changeSummary(change: ToolChange): string {
+  if (change.lines === undefined) return change.parts.join(" + ");
+  const added = change.lines.filter((line) => line.kind === "added").length;
+  const removed = change.lines.filter((line) => line.kind === "removed").length;
+  return `${change.parts.join(" + ")} · +${added}/-${removed} lines`;
 }
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {

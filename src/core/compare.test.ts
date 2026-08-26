@@ -127,12 +127,38 @@ describe("compareTraces", () => {
         rawTrace({ id: "b", tools: [tool("keep", "k"), tool("edit", "new"), tool("add", "a")] }),
       ),
     );
-    expect(comparison.tools).toEqual({
-      added: ["add"],
-      removed: ["drop"],
-      changed: ["edit"],
-      unchanged: 1,
+    expect(comparison.tools).toMatchObject({ added: ["add"], removed: ["drop"], unchanged: 1 });
+    expect(comparison.tools.changed).toEqual([
+      {
+        name: "edit",
+        parts: ["description"],
+        lines: [
+          { kind: "removed", text: "old" },
+          { kind: "added", text: "new" },
+        ],
+      },
+    ]);
+  });
+
+  it("diffs a changed tool schema line by line", () => {
+    const tool = (schema: unknown): RawToolDef => ({
+      type: "function",
+      name: "search",
+      description: "find things",
+      inputSchema: schema,
     });
+    const comparison = compareTraces(
+      side(rawTrace({ id: "a", tools: [tool({ q: "string" })] })),
+      side(rawTrace({ id: "b", tools: [tool({ q: "string", limit: "number" })] })),
+    );
+    const change = comparison.tools.changed[0]!;
+    expect(change.parts).toEqual(["schema"]);
+    expect(change.lines!.some((line) => line.kind === "added" && line.text.includes("limit"))).toBe(
+      true,
+    );
+    expect(change.lines!.some((line) => line.kind === "same" && line.text === "find things")).toBe(
+      true,
+    );
   });
 });
 
