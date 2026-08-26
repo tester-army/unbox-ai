@@ -188,7 +188,7 @@ reference. `unbox-ai summary` prints which format was detected.
 
 ## Contributing
 
-PRs welcome, especially trace-format adapters. To develop locally:
+PRs welcome, especially trace-format adapters. The published CLI runs on Node >=18; developing and releasing need Node >=22.21 (what CI uses). To develop locally:
 
 ```bash
 npm install
@@ -197,6 +197,10 @@ npm run build                                 # dist/viewer + dist/cli
 node dist/cli/index.js summary path/to/trace.json
 npm run check                                 # lint (biome) + typecheck + tests (vitest)
 ```
+
+## Releasing
+
+`npm run release` (from main, clean tree) runs [release-it](https://github.com/release-it/release-it): version inferred from conventional commits, CHANGELOG.md updated, git tag + GitHub release + npm publish. The GitHub token comes from `gh auth token` (or a `GITHUB_TOKEN` you export); npm needs `npm login` once. Preview with `npm run release -- --dry-run --ci`.
 
 ## License
 
