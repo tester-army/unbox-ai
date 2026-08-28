@@ -1,3 +1,4 @@
+import { type AggregateKey, aggregateBy } from "../../core/aggregate";
 import { formatPercent } from "../../core/format";
 import { computeInsights } from "../../core/insights";
 import { toolCallNames } from "../../core/normalize";
@@ -9,13 +10,18 @@ import {
   formatTokens,
   getTraceRef,
   printJson,
+  table,
 } from "../output";
 
 /** Prints trace totals plus a one-liner per generation. */
-export function summary(loaded: LoadedTrace, json: boolean): void {
+export function summary(loaded: LoadedTrace, json: boolean, by?: AggregateKey): void {
   const { trace } = loaded;
   const insights = computeInsights(trace);
   if (json) {
+    if (by !== undefined) {
+      printJson({ by, rows: aggregateBy(trace, by) });
+      return;
+    }
     printJson({
       traceId: trace.traceId,
       format: loaded.format,
@@ -57,6 +63,37 @@ export function summary(loaded: LoadedTrace, json: boolean): void {
     );
   }
   console.log("");
+  if (by !== undefined) {
+    const rows = aggregateBy(trace, by).map((row) => [
+      row.key,
+      ...(by === "segment" ? [row.label ?? ""] : []),
+      String(row.generations),
+      formatTokens(row.inputTokens),
+      formatPercent(row.cachedTokens, row.inputTokens),
+      formatTokens(row.outputTokens),
+      formatSeconds(row.latency),
+      formatCost(row.cost),
+      String(row.toolCalls),
+    ]);
+    console.log(
+      table(
+        [
+          by,
+          ...(by === "segment" ? ["agent"] : []),
+          "generations",
+          "input",
+          "cached",
+          "output",
+          "latency",
+          "cost",
+          "tool calls",
+        ],
+        rows,
+      ),
+    );
+    console.log(`\nnext: unbox-ai events ${getTraceRef()} | unbox-ai event ${getTraceRef()} <idx>`);
+    return;
+  }
   for (const gen of trace.generations) {
     const calls = formatCallNames(toolCallNames(gen));
     const last = gen.newMessages.at(-1);
