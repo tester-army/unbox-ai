@@ -80,8 +80,9 @@ interface EventPosition {
   /** Index of the event this one continues, when it continues one. */
   prevIndex: number | null;
   /**
-   * First carried message whose content was rewritten in place (context
-   * compaction). Equals carried when the whole prefix is byte-identical.
+   * First carried message whose content was rewritten in place (compaction
+   * or a live-updating notice). Equals carried when the whole prefix is
+   * byte-identical.
    */
   firstMutation: number;
 }
@@ -90,7 +91,8 @@ interface EventPosition {
  * Groups events into conversation threads (segments). Traces interleave
  * agents, so each event is matched against the latest event with the same
  * name; compatibility is structural (roles and tool call ids), tolerating
- * in-place "[compacted]" rewrites of older messages.
+ * in-place rewrites (compaction, live-updating turn/time/progress notices)
+ * of older messages.
  */
 function assignSegments(events: RawEvent[]): EventPosition[] {
   const positions: EventPosition[] = [];
@@ -119,9 +121,10 @@ function assignSegments(events: RawEvent[]): EventPosition[] {
 }
 
 /**
- * Returns the index of the first compacted (mutated) carried message when
- * next continues prev's conversation, prev.length when the prefix is exact,
- * or null when it is a different conversation.
+ * Returns the index of the first in-place rewrite (compaction or a
+ * live-updating turn/time/progress notice) when next continues prev's
+ * conversation, prev.length when the prefix is exact, or null when it is a
+ * different conversation.
  */
 function continuationOf(prev: RawMessage[], next: RawMessage[]): number | null {
   if (prev.length === 0 || prev.length > next.length) return null;
@@ -141,7 +144,7 @@ function continuationOf(prev: RawMessage[], next: RawMessage[]): number | null {
         a.tool_calls?.map((c) => c.id),
         b.tool_calls?.map((c) => c.id),
       );
-    if (structurallySame && isCompacted(b)) {
+    if (structurallySame && (isCompacted(b) || next.length > prev.length)) {
       firstMutation = Math.min(firstMutation, k);
       continue;
     }

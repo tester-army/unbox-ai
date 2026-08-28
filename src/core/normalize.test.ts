@@ -28,6 +28,10 @@ function event(messages: RawMessage[], overrides: Partial<RawEvent> = {}): RawEv
 
 const SYS: RawMessage = { role: "system", content: "sys prompt" };
 const USER: RawMessage = { role: "user", content: "hello" };
+const notice = (turn: number): RawMessage => ({
+  role: "system",
+  content: `[SYSTEM NOTICE] Turn ${turn}.`,
+});
 
 describe("segments", () => {
   it("joins continuations and splits resets", () => {
@@ -42,6 +46,43 @@ describe("segments", () => {
     expect(normalized.segmentCount).toBe(2);
     expect(normalized.generations.map((g) => g.segment)).toEqual([0, 0, 1]);
     expect(normalized.generations[1]!.carriedMessages).toBe(2);
+  });
+
+  it("joins a continuation with a live-updating system notice", () => {
+    const normalized = normalizeTrace(
+      trace([
+        event([SYS, notice(0), USER]),
+        event([
+          SYS,
+          notice(1),
+          USER,
+          { role: "assistant", content: "reply" },
+          { role: "user", content: "next" },
+        ]),
+      ]),
+    );
+    expect(normalized.segmentCount).toBe(1);
+    expect(normalized.generations.map((g) => g.segment)).toEqual([0, 0]);
+    expect(normalized.generations[1]!.carriedMessages).toBe(3);
+
+    const breakdown = normalized.generations[1]!.breakdown;
+    const items = breakdown.groups.flatMap((group) => group.items);
+    expect(items.map((item) => item.cached)).toEqual([true, false, false, false, false]);
+    expect(breakdown.cacheableTokens).toBe(items[0]!.estTokens);
+    expect(breakdown.cacheableTokens).toBeLessThan(
+      items.slice(0, 3).reduce((total, item) => total + item.estTokens, 0),
+    );
+  });
+
+  it("splits a same-shaped restart with changed content", () => {
+    const normalized = normalizeTrace(
+      trace([
+        event([SYS, notice(0), USER, { role: "assistant", content: "reply A" }]),
+        event([SYS, notice(0), USER, { role: "assistant", content: "reply B" }]),
+      ]),
+    );
+    expect(normalized.segmentCount).toBe(2);
+    expect(normalized.generations.map((g) => g.segment)).toEqual([0, 1]);
   });
 });
 
