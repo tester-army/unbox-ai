@@ -28,10 +28,18 @@ function event(messages: RawMessage[], overrides: Partial<RawEvent> = {}): RawEv
 
 const USER: RawMessage = { role: "user", content: "hello" };
 
+function toolCall(id: string, name: string): RawMessage {
+  return {
+    role: "assistant",
+    content: "",
+    tool_calls: [{ type: "function", id, function: { name, arguments: {} } }],
+  };
+}
+
 function sampleTrace() {
   return normalizeTrace(
     trace([
-      event([USER], {
+      event([{ role: "user", content: "one" }, toolCall("a1", "search")], {
         name: "agent-a",
         model: "model-z",
         metrics: { latency: 1, tokens: { input: 10, output: 1 }, cost: 2 },
@@ -46,17 +54,30 @@ function sampleTrace() {
           { type: "function", name: "b" },
         ],
       }),
-      event([USER], {
-        name: "agent-a",
-        model: "model-a",
-        metrics: { latency: 3, tokens: { input: 30, output: 3 }, cost: 3 },
-        available_tools: [
-          { type: "function", name: "a" },
-          { type: "function", name: "b" },
-          { type: "function", name: "c" },
+      event(
+        [
+          { role: "user", content: "three" },
+          {
+            role: "assistant",
+            content: "",
+            tool_calls: [
+              { type: "function", id: "a2", function: { name: "search", arguments: {} } },
+              { type: "function", id: "a3", function: { name: "click", arguments: {} } },
+            ],
+          },
         ],
-      }),
-      event([USER], {
+        {
+          name: "agent-a",
+          model: "model-a",
+          metrics: { latency: 3, tokens: { input: 30, output: 3 }, cost: 3 },
+          available_tools: [
+            { type: "function", name: "a" },
+            { type: "function", name: "b" },
+            { type: "function", name: "c" },
+          ],
+        },
+      ),
+      event([{ role: "user", content: "four" }, toolCall("c1", "report")], {
         name: "agent-c",
         model: "model-z",
         metrics: { latency: 4, tokens: { input: 40, output: 4 }, cost: 6 },
@@ -78,11 +99,11 @@ describe("aggregateBy", () => {
         key: "model-a",
         generations: 2,
         inputTokens: 50,
-        cachedTokens: 10,
+        cachedTokens: 0,
         outputTokens: 5,
         latency: 5,
         cost: 8,
-        toolCalls: 5,
+        toolCalls: 2,
       },
       {
         key: "model-z",
@@ -92,7 +113,7 @@ describe("aggregateBy", () => {
         outputTokens: 5,
         latency: 5,
         cost: 8,
-        toolCalls: 5,
+        toolCalls: 2,
       },
     ]);
   });
@@ -107,17 +128,17 @@ describe("aggregateBy", () => {
         outputTokens: 4,
         latency: 4,
         cost: 6,
-        toolCalls: 4,
+        toolCalls: 1,
       },
       {
         key: "agent-a",
         generations: 2,
         inputTokens: 40,
-        cachedTokens: 10,
+        cachedTokens: 0,
         outputTokens: 4,
         latency: 4,
         cost: 5,
-        toolCalls: 4,
+        toolCalls: 3,
       },
       {
         key: "agent-b",
@@ -127,7 +148,7 @@ describe("aggregateBy", () => {
         outputTokens: 2,
         latency: 2,
         cost: 5,
-        toolCalls: 2,
+        toolCalls: 0,
       },
     ]);
   });
@@ -137,13 +158,13 @@ describe("aggregateBy", () => {
       {
         key: "0",
         label: "agent-a",
-        generations: 2,
-        inputTokens: 40,
-        cachedTokens: 10,
-        outputTokens: 4,
-        latency: 4,
-        cost: 5,
-        toolCalls: 4,
+        generations: 1,
+        inputTokens: 10,
+        cachedTokens: 0,
+        outputTokens: 1,
+        latency: 1,
+        cost: 2,
+        toolCalls: 1,
       },
       {
         key: "1",
@@ -154,10 +175,21 @@ describe("aggregateBy", () => {
         outputTokens: 2,
         latency: 2,
         cost: 5,
-        toolCalls: 2,
+        toolCalls: 0,
       },
       {
         key: "2",
+        label: "agent-a",
+        generations: 1,
+        inputTokens: 30,
+        cachedTokens: 0,
+        outputTokens: 3,
+        latency: 3,
+        cost: 3,
+        toolCalls: 2,
+      },
+      {
+        key: "3",
         label: "agent-c",
         generations: 1,
         inputTokens: 40,
@@ -165,7 +197,7 @@ describe("aggregateBy", () => {
         outputTokens: 4,
         latency: 4,
         cost: 6,
-        toolCalls: 4,
+        toolCalls: 1,
       },
     ]);
   });

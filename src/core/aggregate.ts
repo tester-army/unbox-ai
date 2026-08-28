@@ -1,3 +1,4 @@
+import { toolCallNames } from "./normalize";
 import type { NormalizedTrace } from "./types";
 
 export type AggregateKey = "model" | "agent" | "segment";
@@ -40,7 +41,7 @@ export function aggregateBy(trace: NormalizedTrace, key: AggregateKey): Aggregat
     row.outputTokens += generation.metrics.outputTokens;
     row.latency += generation.metrics.latency;
     row.cost += generation.metrics.cost;
-    row.toolCalls += generation.toolCount;
+    row.toolCalls += toolCallNames(generation).length;
     rows.set(rowKey, row);
   }
 
