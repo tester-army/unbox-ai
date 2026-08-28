@@ -28,9 +28,10 @@ function event(messages: RawMessage[], overrides: Partial<RawEvent> = {}): RawEv
 
 const SYS: RawMessage = { role: "system", content: "sys prompt" };
 const USER: RawMessage = { role: "user", content: "hello" };
-const notice = (turn: number): RawMessage => ({
+/** A runtime-injected message the agent rewrites in place every turn. */
+const reminder = (turn: number): RawMessage => ({
   role: "system",
-  content: `[SYSTEM NOTICE] Turn ${turn}.`,
+  content: `turn ${turn}`,
 });
 
 describe("segments", () => {
@@ -48,13 +49,13 @@ describe("segments", () => {
     expect(normalized.generations[1]!.carriedMessages).toBe(2);
   });
 
-  it("joins a continuation with a live-updating system notice", () => {
+  it("joins a continuation with a live-updating injected reminder", () => {
     const normalized = normalizeTrace(
       trace([
-        event([SYS, notice(0), USER]),
+        event([SYS, reminder(0), USER]),
         event([
           SYS,
-          notice(1),
+          reminder(1),
           USER,
           { role: "assistant", content: "reply" },
           { role: "user", content: "next" },
@@ -77,8 +78,8 @@ describe("segments", () => {
   it("splits a same-shaped restart with changed content", () => {
     const normalized = normalizeTrace(
       trace([
-        event([SYS, notice(0), USER, { role: "assistant", content: "reply A" }]),
-        event([SYS, notice(0), USER, { role: "assistant", content: "reply B" }]),
+        event([SYS, reminder(0), USER, { role: "assistant", content: "reply A" }]),
+        event([SYS, reminder(0), USER, { role: "assistant", content: "reply B" }]),
       ]),
     );
     expect(normalized.segmentCount).toBe(2);
