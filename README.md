@@ -56,6 +56,7 @@ gateway exports, opencode session exports, and AI SDK devtools databases (see
 
 ```
 --json        machine-readable output
+--by <key>    summary aggregation: model | agent | segment
 --port <n>    server port (view default 4177, devtools default 4983)
 --no-open     start the server without opening a browser
 ```
@@ -114,6 +115,7 @@ The same binary is a bounded, read-only trace explorer - safe to allowlist:
 ```bash
 unbox-ai runs trace.json             # multi-run sources: one line per run, then scope with --run
 unbox-ai summary trace.json          # totals + one line per generation
+unbox-ai summary trace.json --by model   # totals grouped by model
 unbox-ai events trace.json           # table: tokens, latency, cost, tool calls
 unbox-ai event trace.json 5          # one generation, new messages only
 unbox-ai tools trace.json            # every tool call: status, time, size, args

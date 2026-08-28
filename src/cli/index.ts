@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import type { AggregateKey } from "../core/aggregate";
 import type { MessageRole } from "../core/types";
 import { compare } from "./commands/compare";
 import { event } from "./commands/event";
@@ -22,7 +23,8 @@ Usage:
   unbox-ai view <trace.json> [more...]   open the visualization (several files = one run list)
   unbox-ai devtools                      live viewer for AI SDK apps (@ai-sdk/devtools drop-in)
   unbox-ai runs <trace.json>             one line per independent run (devtools databases)
-  unbox-ai summary <trace.json>          totals + one line per generation
+  unbox-ai summary <trace.json> [--by <model|agent|segment>]
+                                         totals + one line per generation, or an aggregation table
   unbox-ai events <trace.json>           generation table (tokens, latency, cost, tool calls)
   unbox-ai event <trace.json> <idx>      one generation: metrics, token split, new messages
   unbox-ai tools <trace.json>            tool usage summary (--all for every call)
@@ -36,6 +38,7 @@ Options:
   --run <n|id>    scope a text command to one run of a multi-run source (see: runs);
                   compare takes it twice - first scopes A, second scopes B
   --trajectory    compare only: aligned per-generation action table (* = diverged)
+  --by <key>      summary aggregation: model | agent | segment
   --port <n>      server port (view default 4177; devtools default 4983)
   --no-open       start the server without opening a browser
   --role <r>      filter: system | user | assistant | tool-result | unknown
@@ -67,6 +70,7 @@ function main(): void {
       json: { type: "boolean", default: false },
       run: { type: "string", multiple: true },
       trajectory: { type: "boolean", default: false },
+      by: { type: "string" },
       port: { type: "string" },
       "no-open": { type: "boolean", default: false },
       all: { type: "boolean", default: false },
@@ -121,12 +125,14 @@ function main(): void {
   if (values.run !== undefined && values.run.length > 1) {
     fail(`--run can be given once for ${command}; twice is for compare`);
   }
+  const by =
+    command === "summary" && values.by !== undefined ? parseAggregateKey(values.by) : undefined;
   if (run !== undefined) setTraceRef(`<trace> --run ${run}`);
   const loaded = run !== undefined ? loadRun(tracePath, run) : loadTrace(tracePath);
 
   switch (command) {
     case "summary":
-      summary(loaded, values.json);
+      summary(loaded, values.json, by);
       return;
     case "events":
       events(loaded, values.json);
@@ -248,6 +254,14 @@ function parseRole(value: string): MessageRole {
     fail(`Unknown role: ${value}. Expected one of: ${ROLES.join(", ")}`);
   }
   return value as MessageRole;
+}
+
+function parseAggregateKey(value: string): AggregateKey {
+  const keys: AggregateKey[] = ["model", "agent", "segment"];
+  if (!keys.includes(value as AggregateKey)) {
+    fail(`Unknown --by value: ${value}. Expected one of: ${keys.join(", ")}`);
+  }
+  return value as AggregateKey;
 }
 
 declare const VERSION: string;
