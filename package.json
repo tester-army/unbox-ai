@@ -1,6 +1,6 @@
 {
   "name": "unbox-ai",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Unbox AI traces: visualize agent runs in the browser or explore them from the CLI",
   "license": "MIT",
   "author": "Oskar Kwasniewski <oskar@tester.army>",
