@@ -48,6 +48,9 @@
     "prepublishOnly": "npm run check && npm run build",
     "release": "GITHUB_TOKEN=${GITHUB_TOKEN:-$(gh auth token)} release-it"
   },
+  "overrides": {
+    "esbuild": "0.28.1"
+  },
   "devDependencies": {
     "@base-ui-components/react": "1.0.0-rc.0",
     "@biomejs/biome": "^2.5.10",
